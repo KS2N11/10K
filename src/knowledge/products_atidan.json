@@ -1,0 +1,128 @@
+[
+  {
+    "product_id": "ai-innovation-suite",
+    "title": "AI Innovation Suite",
+    "summary": "End-to-end AI and machine learning solutions for automation, analytics, and intelligent engagement.",
+    "capabilities": [
+      "predictive analytics",
+      "natural language processing",
+      "computer vision",
+      "chatbots and conversational AI",
+      "process automation"
+    ],
+    "icp": {
+      "industries": ["Retail", "Financial Services", "Healthcare", "Manufacturing", "Technology"],
+      "min_emp": 200
+    },
+    "proof_points": [
+      "Delivered enterprise AI platforms combining NLP, vision, and automation APIs",
+      "Enhanced decision-making and customer engagement for large enterprises",
+      "Custom AI accelerators for rapid deployment using Azure Cognitive Services"
+    ]
+  },
+  {
+    "product_id": "cloud-modernization",
+    "title": "Cloud Modernization & Management",
+    "summary": "Comprehensive cloud consulting, migration, and managed services to ensure scalability, security, and efficiency.",
+    "capabilities": [
+      "cloud strategy & consulting",
+      "migration & modernization",
+      "cloud governance & cost optimization",
+      "24x7 monitoring & DevOps automation",
+      "disaster recovery & compliance"
+    ],
+    "icp": {
+      "industries": ["SaaS", "Technology", "Financial Services", "Retail"],
+      "min_emp": 100
+    },
+    "proof_points": [
+      "Successful multi-cloud migrations for enterprise workloads",
+      "Optimized infrastructure costs and performance across Azure & AWS",
+      "Continuous monitoring and governance frameworks for global clients"
+    ]
+  },
+  {
+    "product_id": "data-analytics-platform",
+    "title": "Data & Analytics Platform",
+    "summary": "Unified data solutions enabling real-time insights, predictive modeling, and business intelligence.",
+    "capabilities": [
+      "data warehousing & lakes",
+      "ETL & integration pipelines",
+      "real-time dashboards",
+      "predictive modeling",
+      "self-service BI"
+    ],
+    "icp": {
+      "industries": ["E-commerce", "Telecom", "Consumer Goods", "Finance"],
+      "min_emp": 150
+    },
+    "proof_points": [
+      "Built data lakes and analytics systems leveraging Hadoop and Azure Synapse",
+      "Reduced reporting cycles from weeks to hours",
+      "Enabled AI-ready data pipelines for multiple enterprises"
+    ]
+  },
+  {
+    "product_id": "digital-transformation-services",
+    "title": "Digital Transformation Services",
+    "summary": "Modern workplace and digital process re-engineering for hybrid work, collaboration, and efficiency.",
+    "capabilities": [
+      "process digitization",
+      "workflow automation",
+      "collaboration platforms (Teams, SharePoint)",
+      "UI/UX modernization",
+      "change management"
+    ],
+    "icp": {
+      "industries": ["Professional Services", "Education", "Healthcare", "Public Sector"],
+      "min_emp": 100
+    },
+    "proof_points": [
+      "Enabled digital workplaces for global distributed teams",
+      "Improved collaboration and productivity through Microsoft ecosystem solutions",
+      "Delivered enterprise-grade modernization roadmaps"
+    ]
+  },
+  {
+    "product_id": "cybersecurity-and-compliance",
+    "title": "Cybersecurity & Compliance",
+    "summary": "Security-first approach to cloud and digital environments with proactive risk monitoring and compliance management.",
+    "capabilities": [
+      "threat monitoring & incident response",
+      "identity & access management",
+      "data protection & encryption",
+      "regulatory compliance (SOC, ISO, GDPR)",
+      "zero-trust architecture"
+    ],
+    "icp": {
+      "industries": ["Finance", "Healthcare", "Technology"],
+      "min_emp": 250
+    },
+    "proof_points": [
+      "Established secure cloud frameworks with zero-trust controls",
+      "Achieved compliance automation for global clients",
+      "Implemented proactive monitoring for 24x7 protection"
+    ]
+  },
+  {
+    "product_id": "global-talent-solutions",
+    "title": "Global Talent & Offshore Solutions",
+    "summary": "IT staffing, dedicated offshore teams, and managed delivery centers for scalable, high-quality technology talent.",
+    "capabilities": [
+      "contract and permanent staffing",
+      "offshore development centers",
+      "global talent management",
+      "project-based delivery teams",
+      "technical recruiting & HR support"
+    ],
+    "icp": {
+      "industries": ["Technology", "Consulting", "Product Development"],
+      "min_emp": 50
+    },
+    "proof_points": [
+      "Operates global talent network across 14+ countries",
+      "Provides end-to-end ODC setup and management",
+      "Supports enterprise-scale hiring and project delivery"
+    ]
+  }
+]

@@ -1,0 +1,125 @@
+# Example configuration file for 10K Insight Agent
+# Copy this to settings.yaml and fill in your values
+
+# ============================================================================
+# API KEYS
+# ============================================================================
+
+# OpenAI Configuration (Optional - for fallback)
+openai_api_key: "sk-your-openai-api-key-here"
+
+# Groq Configuration (Recommended - Fast & Free Tier)
+# Get your free key at: https://console.groq.com
+groq_api_key: "gsk_your-groq-api-key-here"
+
+# Cohere Configuration (Optional - for embeddings fallback)
+# Get your free key at: https://dashboard.cohere.com
+cohere_api_key: "your-cohere-api-key-here"
+
+# ============================================================================
+# MODEL CONFIGURATION
+# ============================================================================
+
+# Model Selection Strategy
+model_strategy: "fallback"  # Options: "single", "fallback", "round-robin"
+
+# Embedding Configuration
+embedding:
+  primary_provider: "sentence-transformers"  # Options: "openai", "sentence-transformers", "cohere"
+  fallback_providers: ["openai"]  # Fallback order if primary fails
+  
+  # Sentence Transformers (Local, Free, No API needed)
+  sentence_transformers:
+    model_name: "all-mpnet-base-v2"  # Options: "all-mpnet-base-v2" (better quality) or "all-MiniLM-L6-v2" (faster)
+    device: "cpu"  # Options: "cpu" or "cuda" (if you have NVIDIA GPU)
+    
+  # OpenAI Embeddings
+  openai:
+    model_name: "text-embedding-3-large"
+    
+  # Cohere Embeddings
+  cohere:
+    model_name: "embed-english-v3.0"
+    input_type: "search_document"
+
+# LLM Configuration
+llm:
+  primary_provider: "groq"  # Options: "openai", "groq"
+  fallback_providers: ["openai"]  # Fallback to OpenAI if Groq fails/rate-limited
+  
+  # Groq (Fast, Free Tier - 30 req/min, 7000 tokens/min)
+  groq:
+    model_name: "llama-3.3-70b-versatile"  # Llama 3.3 70B (Production) - Options: "llama-3.1-8b-instant", "llama-3.3-70b-versatile"
+    temperature: 0.7
+    max_tokens: 4096
+    
+  # OpenAI (Paid, Higher Quality)
+  openai:
+    model_name: "gpt-4o-mini"  # Options: "gpt-4o-mini", "gpt-4o", "gpt-4-turbo"
+    temperature: 0.7
+    max_tokens: 4096
+
+# ============================================================================
+# RATE LIMITING
+# ============================================================================
+
+rate_limits:
+  openai:
+    rpm: 3500  # requests per minute
+    tpm: 90000  # tokens per minute
+  groq:
+    rpm: 30  # Free tier limit
+    tpm: 7000  # Free tier limit
+
+# ============================================================================
+# RETRY CONFIGURATION
+# ============================================================================
+
+retry:
+  max_attempts: 3
+  initial_delay: 1  # seconds
+  max_delay: 60
+  exponential_base: 2
+
+# ============================================================================
+# SEC EDGAR CONFIGURATION
+# ============================================================================
+
+# SEC EDGAR Configuration (REQUIRED - must include email)
+sec_user_agent: "10KInsightAgent/0.1 (your.email@company.com)"
+
+# ============================================================================
+# STORAGE CONFIGURATION
+# ============================================================================
+
+# Vector Store Configuration
+vector_store_dir: "src/stores/vector"
+catalog_store_dir: "src/stores/catalog"
+
+# ============================================================================
+# DOCUMENT PROCESSING
+# ============================================================================
+
+# Chunking Configuration
+chunk_size: 1000
+chunk_overlap: 200
+
+# Retrieval Configuration
+top_k_chunks: 10
+top_k_products: 6
+
+# ============================================================================
+# AGENT CONFIGURATION
+# ============================================================================
+
+# Agent Configuration
+max_iterations: 3
+min_confidence: 0.6
+
+# ============================================================================
+# LOGGING
+# ============================================================================
+
+# Logging
+log_level: "INFO"
+log_format: "json"

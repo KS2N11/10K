@@ -1,0 +1,92 @@
+[
+  {
+    "product_id": "cloud-optimizer",
+    "title": "Cloud Optimizer",
+    "summary": "Reduce cloud spend with automated rightsizing and commitment planning.",
+    "capabilities": ["cost optimization", "rightsizing", "forecasting", "multi-cloud support"],
+    "icp": {
+      "industries": ["SaaS", "Retail", "Financial Services"],
+      "min_emp": 200
+    },
+    "proof_points": [
+      "Avg 18% savings in 90 days",
+      "3-month payback period",
+      "Used by 500+ enterprises"
+    ]
+  },
+  {
+    "product_id": "supply-chain-ai",
+    "title": "Supply Chain AI",
+    "summary": "End-to-end supply chain visibility with predictive analytics and risk management.",
+    "capabilities": ["demand forecasting", "inventory optimization", "risk detection", "supplier management"],
+    "icp": {
+      "industries": ["Manufacturing", "Retail", "Consumer Goods"],
+      "min_emp": 500
+    },
+    "proof_points": [
+      "35% reduction in stockouts",
+      "22% decrease in inventory costs",
+      "Real-time visibility across 1000+ suppliers"
+    ]
+  },
+  {
+    "product_id": "compliance-guardian",
+    "title": "Compliance Guardian",
+    "summary": "Automated compliance monitoring and reporting for regulatory requirements.",
+    "capabilities": ["regulatory monitoring", "audit automation", "risk assessment", "reporting"],
+    "icp": {
+      "industries": ["Financial Services", "Healthcare", "Pharma"],
+      "min_emp": 100
+    },
+    "proof_points": [
+      "90% reduction in audit prep time",
+      "SOC 2, HIPAA, GDPR certified",
+      "Trusted by 200+ regulated companies"
+    ]
+  },
+  {
+    "product_id": "cybersec-shield",
+    "title": "CyberSec Shield",
+    "summary": "Advanced threat detection and response platform with AI-powered analytics.",
+    "capabilities": ["threat detection", "incident response", "vulnerability scanning", "zero trust"],
+    "icp": {
+      "industries": ["Technology", "Financial Services", "Healthcare"],
+      "min_emp": 250
+    },
+    "proof_points": [
+      "99.9% threat detection accuracy",
+      "60% faster incident response",
+      "Blocks 10M+ threats daily"
+    ]
+  },
+  {
+    "product_id": "talent-retention-suite",
+    "title": "Talent Retention Suite",
+    "summary": "AI-driven employee engagement and retention platform.",
+    "capabilities": ["employee sentiment analysis", "turnover prediction", "engagement programs", "analytics"],
+    "icp": {
+      "industries": ["Technology", "Professional Services", "Retail"],
+      "min_emp": 150
+    },
+    "proof_points": [
+      "25% reduction in turnover",
+      "85% employee engagement score",
+      "Predicts flight risk 6 months ahead"
+    ]
+  },
+  {
+    "product_id": "revenue-ops-platform",
+    "title": "Revenue Ops Platform",
+    "summary": "Unified platform for sales, marketing, and customer success alignment.",
+    "capabilities": ["pipeline management", "forecasting", "attribution", "workflow automation"],
+    "icp": {
+      "industries": ["SaaS", "Technology", "Professional Services"],
+      "min_emp": 100
+    },
+    "proof_points": [
+      "32% increase in win rates",
+      "95% forecast accuracy",
+      "40% faster sales cycles"
+    ]
+  }
+]
