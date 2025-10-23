@@ -5,10 +5,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from .api.routes import router
+from .api.routes import router, load_config
 from .api.routes_v2 import router as router_v2
+from .api.scheduler_routes import router as scheduler_router
 from .database.database import init_db
 from .utils.logging import setup_logger
+from .services.autonomous_scheduler import get_autonomous_scheduler
 
 # Initialize logger
 logger = setup_logger(__name__, level="INFO")
@@ -17,7 +19,7 @@ logger = setup_logger(__name__, level="INFO")
 app = FastAPI(
     title="10K Insight Agent",
     description="Analyze SEC 10-K filings and match to product catalog using AI agents",
-    version="2.0.0",
+    version="3.0.0 - Autonomous Scheduler",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -34,14 +36,26 @@ app.add_middleware(
 # Include routes
 app.include_router(router, prefix="", tags=["analysis"])
 app.include_router(router_v2, tags=["batch"])
+app.include_router(scheduler_router, tags=["scheduler"])
 
 # Startup event
 @app.on_event("startup")
 async def startup_event():
     """Initialize resources on startup."""
-    logger.info("10K Insight Agent v2.0 starting up...")
+    logger.info("10K Insight Agent v3.0 (Autonomous) starting up...")
     logger.info("Initializing database...")
     init_db()
+    
+    # Start autonomous scheduler
+    try:
+        logger.info("Starting autonomous scheduler...")
+        config = load_config()
+        scheduler = await get_autonomous_scheduler(config)
+        logger.info("✅ Autonomous scheduler started")
+    except Exception as e:
+        logger.error(f"Failed to start autonomous scheduler: {e}")
+        logger.warning("Scheduler can be started manually via API")
+    
     logger.info("✅ FastAPI application ready")
 
 

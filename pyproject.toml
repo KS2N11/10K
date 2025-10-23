@@ -1,7 +1,7 @@
 [project]
 name = "10k-insight-agent"
-version = "2.0.0"
-description = "FastAPI + LangGraph microservice for analyzing SEC 10-K filings and matching to product catalog"
+version = "3.0.0"
+description = "FastAPI + LangGraph microservice with autonomous scheduler for analyzing SEC 10-K filings"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -33,6 +33,7 @@ dependencies = [
     "plotly>=5.18.0",
     "altair>=5.2.0",
     "pandas>=2.2.0",
+    "apscheduler>=3.10.4",
 ]
 
 [project.optional-dependencies]

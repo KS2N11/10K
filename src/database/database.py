@@ -10,6 +10,10 @@ import os
 from dotenv import load_dotenv
 
 from src.database.models import Base
+from src.database.scheduler_models import (
+    SchedulerConfig, SchedulerRun, CompanyPriority, 
+    SchedulerMemory, SchedulerDecision
+)
 
 load_dotenv()
 

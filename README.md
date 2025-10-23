@@ -1,12 +1,27 @@
-# 10K Insight Agent
+# 10K Insight Agent v3.0 - Autonomous Intelligence System
 
-**AI-powered platform that analyzes companies' 10-K filings and matches pain points to your product catalog.**
+**AI-powered platform that autonomously analyzes companies' 10-K filings and matches pain points to your product catalog.**
 
-A complete solution with:
+## 🆕 What's New in v3.0: Autonomous Scheduler
+
+The system now runs **completely autonomously** with:
+- 🤖 **LLM-Powered Decision Making** - AI agent decides which companies to analyze
+- 🧠 **Intelligent Memory** - Remembers past analyses, avoids duplicates, learns patterns
+- ⏰ **Cron-Based Scheduling** - Runs automatically (e.g., daily at 2 AM)
+- 🎯 **Smart Prioritization** - Focuses on SMALL → MID → LARGE → MEGA caps
+- 📊 **Self-Learning** - Gets smarter over time based on results
+
+**See [AUTONOMOUS_SCHEDULER.md](AUTONOMOUS_SCHEDULER.md) for full documentation.**
+
+---
+
+## Complete Solution
+
 - 🎯 **React + TypeScript Frontend** - Modern UI with real-time progress tracking
 - ⚡ **FastAPI Backend** - Async API with background job processing
 - 🤖 **LangGraph AI Workflow** - Agentic analysis with citations and guardrails
-- 📊 **PostgreSQL Database** - Reliable data persistence
+- 🤖 **Autonomous Scheduler** - NEW! Self-operating intelligence system
+- 📊 **PostgreSQL Database** - Reliable data persistence with memory system
 - 💾 **Smart Caching** - Avoid re-analyzing companies unnecessarily
 
 ---
@@ -20,6 +35,7 @@ A complete solution with:
 - **Product Matching**: Maps pain points to your product catalog with fit scores
 - **Pitch Generation**: Creates persona-aware sales pitches with evidence
 - **Citation Tracking**: Every insight includes source references (Item 1A, page X, etc.)
+- **Autonomous Operation**: NEW! Scheduler runs 24/7, intelligently selecting companies to analyze
 
 ### 🚀 Modern UI (React)
 - **Dashboard**: Real-time metrics and quick actions
@@ -31,6 +47,10 @@ A complete solution with:
 - **Metrics Dashboard**: Token usage, processing time, cache hit rates
 
 ### 💡 Recent Improvements (October 2025)
+- ✅ **Autonomous Scheduler** (v3.0): LLM-powered continuous operation with memory
+- ✅ **Smart Prioritization**: SMALL caps first, then MID, LARGE, MEGA
+- ✅ **Intelligent Memory**: Remembers analyses, learns patterns, optimizes decisions
+- ✅ **Cron Scheduling**: Configurable schedules (daily, weekly, custom)
 - ✅ **Live Progress Tracking**: Real-time updates without manual refresh
 - ✅ **Metrics Tracking**: Time and token usage for every analysis
 - ✅ **Smart Caching**: Skip already-analyzed companies (60-80% efficiency gain)
@@ -80,11 +100,18 @@ scripts/start_postgres.sh   # Linux/Mac
 # 6. Initialize database
 python init_db.py
 
-# 7. Start application
+# 6. Start application
 start_react.bat  # Windows - starts both API and React
 # or manually:
 # Terminal 1: uvicorn src.main:app --reload --port 8000
 # Terminal 2: cd frontend && npm run dev
+
+# 7. (Optional) Enable Autonomous Scheduler
+# Via API:
+curl -X PUT http://localhost:8000/api/scheduler/config \
+  -H "Content-Type: application/json" \
+  -d '{"is_active": true, "cron_schedule": "0 2 * * *"}'
+# Or manually: see AUTONOMOUS_SCHEDULER.md
 ```
 
 ### Access the Application
