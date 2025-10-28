@@ -49,7 +49,7 @@ llm:
   
   # Groq (Fast, Free Tier - 30 req/min, 7000 tokens/min)
   groq:
-    model_name: "llama-3.3-70b-versatile"  # Llama 3.3 70B (Production) - Options: "llama-3.1-8b-instant", "llama-3.3-70b-versatile"
+    model_name: "Qwen3-32B"  # Llama 3.3 70B (Production) - Options: "llama-3.1-8b-instant", "llama-3.3-70b-versatile"
     temperature: 0.7
     max_tokens: 4096
     

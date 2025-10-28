@@ -43,7 +43,17 @@ class AutonomousScheduler:
             config: Configuration dict with API keys, settings
         """
         self.config = config
-        self.scheduler = AsyncIOScheduler()
+        # Configure scheduler with safe defaults to avoid missed runs
+        # - coalesce: collapse multiple pending runs into one
+        # - max_instances: prevent overlapping job instances
+        # - misfire_grace_time: tolerate short delays without dropping the run
+        self.scheduler = AsyncIOScheduler(
+            job_defaults={
+                "coalesce": True,
+                "max_instances": 1,
+                "misfire_grace_time": 600,  # 10 minutes
+            }
+        )
         self.llm_manager = None
         self.embedder = None
         self.scheduler_agent = None
@@ -70,8 +80,8 @@ class AutonomousScheduler:
                 # Create default config
                 logger.info("Creating default scheduler configuration...")
                 scheduler_config = SchedulerConfig(
-                    cron_schedule="0 2 * * *",  # Daily at 2 AM
-                    is_active=False,  # Start paused
+                    cron_schedule="*/5 * * * *",  # Every 5 minutes for demo
+                    is_active=True,  # Start active
                     market_cap_priority=["SMALL", "MID", "LARGE", "MEGA"],
                     batch_size=10,
                     analysis_interval_days=90,
@@ -315,7 +325,10 @@ class AutonomousScheduler:
                 trigger=trigger,
                 id="main_cron_job",
                 name="Autonomous Analysis Scheduler",
-                replace_existing=True
+                replace_existing=True,
+                coalesce=True,
+                max_instances=1,
+                misfire_grace_time=600,
             )
             
             # Calculate next run time
@@ -421,9 +434,8 @@ class AutonomousScheduler:
             else:
                 # Fallback: simple rule-based selection
                 logger.info("Using rule-based company selection...")
-                # Create a temporary config-like dict for fallback
-                temp_config = type('obj', (object,), config_values)
-                companies_to_analyze = await self._rule_based_selection(temp_config)
+                # Pass raw config dict to fallback selection
+                companies_to_analyze = await self._rule_based_selection(config_values)
             
             if not companies_to_analyze:
                 logger.warning("No companies selected for analysis")
@@ -544,14 +556,16 @@ class AutonomousScheduler:
     ) -> list:
         """Fallback rule-based company selection."""
         from src.utils.sec_filter import SECCompanyFilter
-        
+        from src.database.repository import CompanyRepository, AnalysisRepository
+
         companies = []
         sec_filter = SECCompanyFilter(self.config.get("sec_user_agent"))
-        
+
         # Get values from config dict (supports both object and dict)
         market_cap_priority = getattr(config_dict, 'market_cap_priority', config_dict.get('market_cap_priority', []))
         batch_size = getattr(config_dict, 'batch_size', config_dict.get('batch_size', 10))
         max_companies_per_run = getattr(config_dict, 'max_companies_per_run', config_dict.get('max_companies_per_run', 50))
+        analysis_interval_days = getattr(config_dict, 'analysis_interval_days', config_dict.get('analysis_interval_days', 90))
         
         # Select companies by market cap priority
         for market_cap in market_cap_priority:
@@ -564,14 +578,26 @@ class AutonomousScheduler:
             for c in cap_companies:
                 if len(companies) >= max_companies_per_run:
                     break
-                
+
+                # Skip companies analyzed too recently
+                from src.database.database import get_db
+                with get_db() as db:
+                    db_company = CompanyRepository.get_by_cik(db, c.get("cik"))
+                    if db_company:
+                        latest = AnalysisRepository.get_latest_for_company(db, db_company.id)
+                        if latest and latest.completed_at:
+                            days_since = (datetime.utcnow() - latest.completed_at).days
+                            if days_since < analysis_interval_days:
+                                # Too recent; skip this company in fallback selection
+                                continue
+
                 companies.append({
                     "cik": c["cik"],
                     "name": c["name"],
                     "ticker": c.get("ticker"),
                     "market_cap": market_cap,
                     "reason": "periodic_refresh",
-                    "reasoning": "Rule-based selection by market cap priority"
+                    "reasoning": "Rule-based selection by market cap priority and freshness"
                 })
             
             if len(companies) >= max_companies_per_run:

@@ -1,51 +1,33 @@
-# Python cache
+# VCS
+.git
+.gitignore
+
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
+*.pyo
+*.pyd
 .Python
-
-# Virtual environments
+.venv/
 venv/
 env/
-ENV/
-.venv
-
-# Data files
-data/
-*.db
-*.sqlite3
-
-# Vector stores
-src/stores/
-
-# Environment files
-.env
-.env.local
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Git
-.git/
-.gitignore
+# Node/Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
 
-# Documentation
-*.md
-!README.md
+# Data caches/logs
+logs/
+data/filings/
 
-# Test files
+# Docker
+Dockerfile.postgres
+docker-compose.yml
+
+# Tests (optional to speed image builds)
 tests/
-pytest.ini
-
-# Build artifacts
-dist/
-build/
-*.egg-info/

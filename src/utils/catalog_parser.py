@@ -2,7 +2,7 @@
 Product Catalog Parser - Extract and format product/service information from text.
 """
 from typing import List, Dict, Any
-from langchain.schema import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 import json
 from pathlib import Path
 

@@ -340,9 +340,13 @@ class SECCompanyFilter:
                 if mapped_tier == tier_upper:
                     allowed_tickers.add(ticker)
         
-        # Filter companies
+        # Filter companies - randomize order first
         filtered = []
-        for company in companies:
+        import random
+        shuffled = list(companies)  # Create a copy
+        random.shuffle(shuffled)  # Randomize order
+        
+        for company in shuffled:
             if company["ticker"] in allowed_tickers:
                 company["market_cap_tier"] = static_mappings.get(company["ticker"])
                 filtered.append(company)

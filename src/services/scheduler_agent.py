@@ -170,7 +170,7 @@ class SchedulerAgent:
                 market_cap=[market_cap],
                 industry=prioritize_industries,
                 limit=limit // len(market_cap_priority),
-                use_realtime_lookup=False  # Use fast static mapping
+                use_realtime_lookup=False  # Use static mapping for reliability
             )
             
             # Enrich with database history
@@ -196,16 +196,18 @@ class SchedulerAgent:
                 # Determine if company should be considered
                 should_consider = False
                 reason = None
-                
+
+                # Never analyzed before → include
                 if not latest_analysis:
                     should_consider = True
                     reason = ScheduleDecisionReason.FIRST_TIME
-                elif days_since and days_since >= analysis_interval_days:
+                # Analyzed before but stale beyond interval → include
+                elif days_since is not None and days_since >= analysis_interval_days:
                     should_consider = True
                     reason = ScheduleDecisionReason.STALE_DATA
-                elif priority and priority.has_high_value_matches:
-                    should_consider = True
-                    reason = ScheduleDecisionReason.HIGH_PRIORITY
+                # High-priority alone should NOT bypass freshness interval
+                # This prevents selecting the same companies repeatedly when insights already exist
+                # If we later want to allow early re-analysis for high-priority, gate it behind a config flag.
                 
                 if should_consider:
                     # Check exclusions
@@ -230,16 +232,18 @@ class SchedulerAgent:
             if len(candidates) >= limit:
                 break
         
-        # Sort by priority: high-value first, then by market cap priority, then by staleness
+        # Sort by priority: market cap first (SMALL->MEGA), then high-value matches, then staleness
         def sort_key(c):
             market_cap_rank = market_cap_priority.index(c["market_cap"]) if c["market_cap"] in market_cap_priority else 999
             has_matches = 1 if c.get("has_high_value_matches") else 0
             days_since = c.get("days_since_last_analysis", 0) or 0
+            priority_score = c.get("priority_score", 50.0)
             
             return (
-                -has_matches,  # High value matches first
-                market_cap_rank,  # Then by market cap priority
-                -days_since  # Then by staleness
+                market_cap_rank,     # Market cap priority FIRST (SMALL->MEGA)
+                -priority_score,     # Then by priority score
+                -has_matches,        # Then high value matches
+                -days_since         # Finally by staleness
             )
         
         candidates.sort(key=sort_key)
@@ -350,71 +354,137 @@ Return valid JSON only.
     ) -> List[Dict[str, Any]]:
         """Parse LLM response and match with candidate companies."""
         try:
-            # Try to extract JSON from response
-            response_text = llm_response
-            if "```json" in response_text:
-                response_text = response_text.split("```json")[1].split("```")[0].strip()
-            elif "```" in response_text:
-                response_text = response_text.split("```")[1].split("```")[0].strip()
+            # Try multiple JSON extraction methods
+            response_text = llm_response.strip()
             
-            response_data = json.loads(response_text)
+            # Method 1: Find JSON between code blocks
+            if "```" in response_text:
+                for block in response_text.split("```"):
+                    if block.strip().startswith(("{", "[")):
+                        try:
+                            response_data = json.loads(block.strip())
+                            break
+                        except:
+                            continue
+            
+            # Method 2: Find first { to last } in the entire text
+            if "response_data" not in locals():
+                try:
+                    start = response_text.find("{")
+                    end = response_text.rfind("}") + 1
+                    if start >= 0 and end > start:
+                        response_data = json.loads(response_text[start:end])
+                except:
+                    pass
+            
+            # Method 3: Try the whole response as JSON
+            if "response_data" not in locals():
+                try:
+                    response_data = json.loads(response_text)
+                except:
+                    logger.error("Could not parse JSON from LLM response")
+                    raise ValueError("Invalid JSON format")
             
             decisions = []
             candidate_lookup = {c["cik"]: c for c in candidates}
             
-            for selected in response_data.get("selected_companies", []):
-                cik = selected.get("cik")
-                if cik in candidate_lookup:
-                    candidate = candidate_lookup[cik]
-                    decisions.append({
-                        "cik": cik,
-                        "name": selected.get("name", candidate["name"]),
-                        "ticker": candidate.get("ticker"),
-                        "market_cap": candidate.get("market_cap"),
-                        "industry": candidate.get("industry"),
-                        "reason": ScheduleDecisionReason(selected.get("reason", "periodic_refresh")),
-                        "reasoning": selected.get("reasoning", "Selected by LLM"),
-                        "confidence": selected.get("confidence", 0.8),
-                        "expected_value": selected.get("expected_value", ""),
-                        "days_since_last_analysis": candidate.get("days_since_last_analysis"),
-                        "previous_analysis_count": candidate.get("previous_analysis_count", 0),
-                        "previous_avg_match_score": candidate.get("previous_avg_match_score")
-                    })
+            # Validate expected structure
+            if not isinstance(response_data, dict) or "selected_companies" not in response_data:
+                raise ValueError("Response missing 'selected_companies' array")
             
-            logger.info(f"✅ Parsed {len(decisions)} decisions from LLM response")
-            return decisions
+            selected_companies = response_data.get("selected_companies", [])
+            if not isinstance(selected_companies, list):
+                raise ValueError("'selected_companies' must be an array")
+            
+            for selected in selected_companies:
+                if not isinstance(selected, dict):
+                    continue
+                    
+                cik = selected.get("cik")
+                if not cik or cik not in candidate_lookup:
+                    continue
+                    
+                candidate = candidate_lookup[cik]
+                
+                # Validate and clean reason
+                reason = selected.get("reason", "periodic_refresh")
+                try:
+                    reason = ScheduleDecisionReason(reason)
+                except ValueError:
+                    reason = ScheduleDecisionReason.PERIODIC_REFRESH
+                
+                decisions.append({
+                    "cik": cik,
+                    "name": selected.get("name", candidate["name"]),
+                    "ticker": candidate.get("ticker"),
+                    "market_cap": candidate.get("market_cap"),
+                    "industry": candidate.get("industry"),
+                    "reason": reason,
+                    "reasoning": selected.get("reasoning", "Selected by LLM").strip() or "Selected by LLM",
+                    "confidence": min(1.0, max(0.0, float(selected.get("confidence", 0.8)))),
+                    "expected_value": selected.get("expected_value", "").strip(),
+                    "days_since_last_analysis": candidate.get("days_since_last_analysis"),
+                    "previous_analysis_count": candidate.get("previous_analysis_count", 0),
+                    "previous_avg_match_score": candidate.get("previous_avg_match_score")
+                })
+            
+            if decisions:
+                logger.info(f"✅ Successfully parsed {len(decisions)} decisions from LLM response")
+                return decisions
         
         except Exception as e:
             logger.error(f"Error parsing LLM decisions: {e}")
             logger.error(f"LLM response: {llm_response}")
             
-            # Fallback: select top candidates by priority
-            logger.warning("Falling back to rule-based selection")
-            return self._fallback_selection(candidates, 10)
+            # Final fallback: smart rule-based selection
+            logger.warning("Using smart rule-based selection")
+            return self._smart_fallback_selection(candidates)
     
-    def _fallback_selection(
+    def _smart_fallback_selection(
         self,
-        candidates: List[Dict[str, Any]],
-        limit: int
+        candidates: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """Fallback selection if LLM parsing fails."""
+        """Intelligent rule-based selection that strictly enforces market cap priority."""
         decisions = []
+        candidates_by_cap = {}
         
-        for candidate in candidates[:limit]:
-            decisions.append({
-                "cik": candidate["cik"],
-                "name": candidate["name"],
-                "ticker": candidate.get("ticker"),
-                "market_cap": candidate.get("market_cap"),
-                "industry": candidate.get("industry"),
-                "reason": candidate.get("reason", ScheduleDecisionReason.PERIODIC_REFRESH),
-                "reasoning": "Fallback rule-based selection",
-                "confidence": 0.6,
-                "expected_value": "Selected by fallback rules",
-                "days_since_last_analysis": candidate.get("days_since_last_analysis"),
-                "previous_analysis_count": candidate.get("previous_analysis_count", 0),
-                "previous_avg_match_score": candidate.get("previous_avg_match_score")
-            })
+        # Group by market cap
+        for candidate in candidates:
+            cap = candidate.get("market_cap")
+            if cap:
+                if cap not in candidates_by_cap:
+                    candidates_by_cap[cap] = []
+                candidates_by_cap[cap].append(candidate)
+        
+        # Select companies in strict market cap priority order
+        for market_cap in self.config.get("market_cap_priority", ["SMALL", "MID", "LARGE", "MEGA"]):
+            cap_candidates = candidates_by_cap.get(market_cap, [])
+            
+            # Sort by priority score and staleness
+            cap_candidates.sort(key=lambda x: (
+                -(x.get("priority_score", 50.0)),
+                -(x.get("days_since_last_analysis", 0) or 0)
+            ))
+            
+            # Take up to 5 from each cap tier
+            for candidate in cap_candidates[:5]:
+                decisions.append({
+                    "cik": candidate["cik"],
+                    "name": candidate["name"],
+                    "ticker": candidate.get("ticker"),
+                    "market_cap": candidate.get("market_cap"),
+                    "industry": candidate.get("industry"),
+                    "reason": candidate.get("reason", ScheduleDecisionReason.PERIODIC_REFRESH),
+                    "reasoning": f"Selected by priority in {market_cap} cap tier",
+                    "confidence": 0.7,
+                    "expected_value": "Market cap prioritization (SMALL->MEGA)",
+                    "days_since_last_analysis": candidate.get("days_since_last_analysis"),
+                    "previous_analysis_count": candidate.get("previous_analysis_count", 0),
+                    "previous_avg_match_score": candidate.get("previous_avg_match_score")
+                })
+            
+            if len(decisions) >= 10:
+                break
         
         return decisions
     

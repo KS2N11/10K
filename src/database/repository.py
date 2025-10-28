@@ -28,6 +28,11 @@ class CompanyRepository:
     def get_by_cik(db: Session, cik: str) -> Optional[Company]:
         """Get company by CIK."""
         return db.query(Company).filter(Company.cik == cik).first()
+
+    @staticmethod
+    def get_by_id(db: Session, company_id: int) -> Optional[Company]:
+        """Get company by primary key ID."""
+        return db.query(Company).filter(Company.id == company_id).first()
     
     @staticmethod
     def get_or_create(db: Session, cik: str, name: str, **kwargs) -> Company:
