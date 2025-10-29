@@ -127,7 +127,7 @@ class MultiProviderLLM:
         
         return ChatGroq(
             api_key=api_key,
-            model=groq_config.get("model_name", "qwen/qwen3-32B"),
+            model=groq_config.get("model_name", "llama-3.3-70b-versatile"),
             temperature=groq_config.get("temperature", 0.7),
             max_tokens=groq_config.get("max_tokens", 4096),
         )

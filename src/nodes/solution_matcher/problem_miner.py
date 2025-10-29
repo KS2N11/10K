@@ -83,29 +83,24 @@ async def problem_miner_node(state: Dict[str, Any]) -> Dict[str, Any]:
     top_chunks = all_chunks[:top_k]
     
     # Use LLM to extract structured pain points
-    extraction_prompt = """You are an expert business analyst. Analyze the following excerpts from a company's 10-K filing and extract the top 3-5 pain points or business challenges.
+    # Prefer external prompt template for consistency
+    try:
+        from pathlib import Path
+        prompt_path = Path("src/knowledge/prompts/extract_pains.txt")
+        if prompt_path.exists():
+            extraction_prompt = prompt_path.read_text(encoding="utf-8")
+        else:
+            extraction_prompt = (
+                "You are an expert business analyst extracting pain points from SEC 10-K filings.\n"
+                "Return valid JSON only with a 'pains' array.\n"
+            )
+    except Exception:
+        extraction_prompt = (
+            "You are an expert business analyst extracting pain points from SEC 10-K filings.\n"
+            "Return valid JSON only with a 'pains' array.\n"
+        )
 
-For each pain point, provide:
-1. A concise theme (2-5 words)
-2. A detailed rationale explaining the pain
-3. Direct quotes from the text as evidence
-4. A confidence score (0.0-1.0)
-
-Format your response as JSON:
-{
-  "pains": [
-    {
-      "theme": "Supply Chain Disruption",
-      "rationale": "The company faces significant supply chain challenges...",
-      "quotes": ["exact quote from text", "another quote"],
-      "section": "Item 1A",
-      "confidence": 0.85
-    }
-  ]
-}
-
-10-K Excerpts:
-"""
+    extraction_prompt += "\n\n10-K Excerpts:"
     
     # Add chunks to prompt
     for i, chunk in enumerate(top_chunks[:8]):  # Limit context
@@ -117,27 +112,103 @@ Format your response as JSON:
     
     # Call LLM
     messages = [
-        SystemMessage(content="You are a helpful assistant that extracts structured business insights. Always respond with valid JSON."),
+        SystemMessage(content="You are a helpful assistant that extracts structured business insights. You MUST respond with ONLY valid JSON. Do not include any text before or after the JSON. Do not wrap JSON in code blocks."),
         HumanMessage(content=extraction_prompt)
     ]
     
-    response = await llm_manager.ainvoke(messages)
+    response = await llm_manager.ainvoke(messages, temperature=0.2, max_tokens=1500)
     
     # Parse response
     try:
-        # Extract JSON from response (handle markdown code blocks)
+        # Extract JSON from response (robust)
         response_text = response.strip()
-        if "```json" in response_text:
-            response_text = response_text.split("```json")[1].split("```")[0].strip()
-        elif "```" in response_text:
-            response_text = response_text.split("```")[1].split("```")[0].strip()
+        logger.debug(f"Raw LLM response (first 300 chars): {response_text[:300]}")
+
+        response_data = None
+
+        # Method 1: JSON inside markdown code fences (```json or ```)
+        if "```" in response_text:
+            for block in response_text.split("```"):
+                bt = block.strip()
+                # Remove language identifier if present (json, JSON, etc.)
+                if bt.startswith("json"):
+                    bt = bt[4:].strip()
+                elif bt.startswith("JSON"):
+                    bt = bt[4:].strip()
+                
+                if bt.startswith(("{", "[")):
+                    try:
+                        response_data = json.loads(bt)
+                        logger.info("✅ Successfully parsed JSON from code fence")
+                        break
+                    except Exception as e:
+                        logger.debug(f"Failed to parse code fence block: {e}")
+                        continue
+
+        # Method 2: substring from first { to last }
+        if response_data is None:
+            try:
+                start = response_text.find("{")
+                end = response_text.rfind("}") + 1
+                if start >= 0 and end > start:
+                    json_str = response_text[start:end]
+                    response_data = json.loads(json_str)
+                    logger.info("✅ Successfully parsed JSON by finding braces")
+            except Exception as e:
+                logger.debug(f"Failed to parse by finding braces: {e}")
+                response_data = None
+
+        # Method 3: parse entire text as JSON
+        if response_data is None:
+            try:
+                response_data = json.loads(response_text)
+                logger.info("✅ Successfully parsed entire response as JSON")
+            except Exception as e:
+                logger.debug(f"Failed to parse entire response: {e}")
+                response_data = None
         
-        result = json.loads(response_text)
+        # Check if we successfully got JSON
+        if response_data is None:
+            raise json.JSONDecodeError("Could not extract valid JSON from response", response_text, 0)
+
+        # Normalize and extract pains
+        result = response_data if isinstance(response_data, dict) else {"pains": response_data}
         pains = result.get("pains", [])
+        if not pains:
+            pains = result.get("pain_points") or result.get("issues") or []
+        
+        # Validate pain point structure
+        validated_pains = []
+        for pain in pains:
+            if isinstance(pain, dict):
+                # Ensure all required fields exist with defaults
+                validated_pain = {
+                    "theme": pain.get("theme", "Unknown Pain Point"),
+                    "rationale": pain.get("rationale", "No rationale provided"),
+                    "quotes": pain.get("quotes", []),
+                    "section": pain.get("section", "Unknown"),
+                    "confidence": float(pain.get("confidence", 0.5))
+                }
+                validated_pains.append(validated_pain)
+            else:
+                logger.warning(f"Skipping invalid pain point structure: {pain}")
+        
+        if not validated_pains:
+            logger.warning("No valid pain points found after parsing")
+            # Create a minimal pain point rather than failing completely
+            validated_pains = [{
+                "theme": "Insufficient Data",
+                "rationale": "LLM response contained no valid pain point structures",
+                "quotes": [],
+                "section": "N/A",
+                "confidence": 0.4
+            }]
+        
+        logger.info(f"✅ Validated {len(validated_pains)} pain points")
         
         # Add citations
         citations = []
-        for pain in pains:
+        for pain in validated_pains:
             for quote in pain.get("quotes", []):
                 # Find source chunk
                 for chunk in top_chunks:
@@ -155,9 +226,9 @@ Format your response as JSON:
             logger,
             "ProblemMiner",
             "extract_pains",
-            f"Extracted {len(pains)} pain points from {len(top_chunks)} chunks",
+            f"Extracted {len(validated_pains)} pain points from {len(top_chunks)} chunks",
             {
-                "pain_count": len(pains),
+                "pain_count": len(validated_pains),
                 "chunk_count": len(top_chunks),
                 "citations": len(citations)
             }
@@ -165,20 +236,20 @@ Format your response as JSON:
         
         return {
             **state,
-            "pains": pains,
+            "pains": validated_pains,
             "citations": citations,
             "trace": trace
         }
         
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse LLM response as JSON: {e}")
-        logger.debug(f"Response was: {response[:500]}")
+        logger.error(f"Response was (first 1000 chars): {response[:1000]}")
         
-        # Fallback: create basic pain points
+        # Fallback: create basic pain points with more context
         pains = [{
-            "theme": "Analysis Error",
-            "rationale": "Could not parse structured pain points from filing",
-            "quotes": [],
+            "theme": "Analysis Error - JSON Parse Failed",
+            "rationale": f"Could not parse structured pain points from filing. The LLM returned malformed JSON. Error: {str(e)[:100]}",
+            "quotes": ["[Unable to extract quotes due to parsing error]"],
             "section": "N/A",
             "confidence": 0.3
         }]
@@ -188,13 +259,14 @@ Format your response as JSON:
             logger,
             "ProblemMiner",
             "error",
-            f"JSON parsing failed: {str(e)}",
-            {"error": str(e)}
+            f"JSON parsing failed: {str(e)}. Response preview: {response[:200]}",
+            {"error": str(e), "response_preview": response[:200]}
         ).to_dict())
         
         return {
             **state,
             "pains": pains,
             "citations": [],
-            "trace": trace
+            "trace": trace,
+            "error": f"JSON parsing failed: {str(e)}"
         }

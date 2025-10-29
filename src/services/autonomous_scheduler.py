@@ -80,7 +80,7 @@ class AutonomousScheduler:
                 # Create default config
                 logger.info("Creating default scheduler configuration...")
                 scheduler_config = SchedulerConfig(
-                    cron_schedule="*/5 * * * *",  # Every 5 minutes for demo
+                    cron_schedule="0 * * * *",  # Every 60 minutes (at minute 0)
                     is_active=True,  # Start active
                     market_cap_priority=["SMALL", "MID", "LARGE", "MEGA"],
                     batch_size=10,

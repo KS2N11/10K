@@ -96,6 +96,9 @@ async def start_batch_analysis(
     Returns:
         Job ID for tracking progress
     """
+    logger.info(f"🎯 BATCH ANALYSIS REQUEST RECEIVED: {request}")
+    print(f"🎯 BATCH ANALYSIS REQUEST RECEIVED: {request}")
+    
     try:
         # If selected_companies provided, extract names
         company_names = request.company_names

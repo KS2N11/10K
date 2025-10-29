@@ -273,12 +273,12 @@ Full API documentation: http://localhost:8000/docs
 # LLM Configuration
 llm_provider: "groq"              # or "openai"
 groq_api_key: "your-key-here"
-groq_model: "llama-3.1-70b-versatile"
+groq_model: "llama-3.3-70b-versatile"
 openai_api_key: "sk-..."          # if using OpenAI
 
 # Embedding Configuration
 embedding_provider: "groq"
-embedding_model: "llama-3.1-70b-versatile"
+embedding_model: "llama-3.3-70b-versatile"
 
 # SEC Configuration
 sec_user_agent: "YourName your@email.com"  # REQUIRED by SEC

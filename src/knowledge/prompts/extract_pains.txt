@@ -16,8 +16,13 @@ IMPORTANT:
 - Be specific and avoid generic statements
 - Higher confidence for pains mentioned multiple times or in detail
 
-Example Output Format:
-```json
+CRITICAL OUTPUT INSTRUCTIONS:
+- Return ONLY valid JSON, no explanations or text before/after
+- Do NOT wrap JSON in markdown code blocks (```)
+- Do NOT add any commentary or explanations
+- Your entire response must be parseable as JSON
+
+Example Output Format (return exactly in this format):
 {
   "pains": [
     {
@@ -32,4 +37,3 @@ Example Output Format:
     }
   ]
 }
-```

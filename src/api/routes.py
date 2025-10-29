@@ -54,7 +54,7 @@ def load_config() -> Dict[str, Any]:
                 "primary_provider": os.getenv("PRIMARY_LLM_PROVIDER", "groq"),
                 "fallback_providers": ["openai"],
                 "groq": {
-                    "model_name": "llama-3.1-70b-versatile",
+                    "model_name": "llama-3.3-70b-versatile",
                     "temperature": 0.7,
                     "max_tokens": 4096
                 },
