@@ -237,6 +237,25 @@ class ApiClient {
   getFilingDocumentUrl(companyId: number): string {
     return `${API_BASE_URL}/api/v2/filings/${companyId}/document`;
   }
+
+  // Catalog Management
+  async getCurrentCatalog(): Promise<{ products: any[] }> {
+    const response = await this.client.get('/api/v2/catalog/current');
+    return response.data;
+  }
+
+  async uploadCatalog(params: {
+    text_content: string;
+    company_name?: string;
+    merge_with_existing?: boolean;
+  }): Promise<{ products_count: number; message: string }> {
+    const response = await this.client.post('/api/v2/catalog/upload', params);
+    return response.data;
+  }
+
+  async deleteProduct(productId: string): Promise<void> {
+    await this.client.delete(`/api/v2/catalog/products/${productId}`);
+  }
 }
 
 export const apiClient = new ApiClient();

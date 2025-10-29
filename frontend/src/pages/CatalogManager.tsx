@@ -36,8 +36,7 @@ const CatalogManager: React.FC = () => {
     try {
       setLoading(true);
       setError('');
-      const response = await fetch('http://localhost:8000/api/v2/catalog/current');
-      const data = await response.json();
+      const data = await apiClient.getCurrentCatalog();
       setProducts(data.products || []);
     } catch (err: any) {
       setError(err.message || 'Failed to load catalog');
@@ -57,22 +56,12 @@ const CatalogManager: React.FC = () => {
       setError('');
       setUploadSuccess('');
 
-      const response = await fetch('http://localhost:8000/api/v2/catalog/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text_content: catalogText,
-          company_name: companyName || 'Your Company',
-          merge_with_existing: mergeWithExisting
-        })
+      const data = await apiClient.uploadCatalog({
+        text_content: catalogText,
+        company_name: companyName || 'Your Company',
+        merge_with_existing: mergeWithExisting
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Upload failed');
-      }
-
-      const data = await response.json();
       setUploadSuccess(`✅ Successfully parsed and saved ${data.products_count} products!`);
       
       // Refresh catalog
@@ -89,7 +78,7 @@ const CatalogManager: React.FC = () => {
       }, 2000);
       
     } catch (err: any) {
-      setError(err.message);
+      setError(err.response?.data?.detail || err.message);
     } finally {
       setUploading(false);
     }
@@ -101,17 +90,10 @@ const CatalogManager: React.FC = () => {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/api/v2/catalog/products/${productId}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete product');
-      }
-
+      await apiClient.deleteProduct(productId);
       await fetchCatalog();
     } catch (err: any) {
-      setError(err.message);
+      setError(err.response?.data?.detail || err.message);
     }
   };
 
