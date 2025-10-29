@@ -6,7 +6,7 @@ The **Autonomous Scheduler** is an intelligent, self-operating system that conti
 
 ### Key Features
 
-✅ **Fully Autonomous**: Runs 24/7 with cron-based scheduling (e.g., daily at 2 AM)  
+✅ **Fully Autonomous**: Runs 24/7 with cron-based scheduling (e.g., every 15 minutes)  
 ✅ **LLM-Powered Decisions**: AI agent selects companies intelligently based on business value  
 ✅ **Smart Memory**: Remembers past analyses, avoids duplicates, learns patterns  
 ✅ **Market Cap Priority**: Automatically prioritizes SMALL → MID → LARGE → MEGA caps  
@@ -88,7 +88,7 @@ Configuration for the autonomous scheduler.
 ```sql
 CREATE TABLE scheduler_config (
     id SERIAL PRIMARY KEY,
-    cron_schedule VARCHAR(100) DEFAULT '0 2 * * *',  -- Daily 2 AM
+    cron_schedule VARCHAR(100) DEFAULT '*/15 * * * *',  -- Every 15 minutes
     is_active BOOLEAN DEFAULT FALSE,
     market_cap_priority JSON DEFAULT '["SMALL", "MID", "LARGE", "MEGA"]',
     batch_size INTEGER DEFAULT 10,
@@ -336,9 +336,9 @@ GET /api/scheduler/status
 {
   "is_running": true,
   "is_active": true,
-  "cron_schedule": "0 2 * * *",
+  "cron_schedule": "*/15 * * * *",
   "last_run_at": "2025-10-23T02:00:00Z",
-  "next_run_at": "2025-10-24T02:00:00Z",
+  "next_run_at": "2025-10-23T02:15:00Z",
   "current_job_id": null,
   "config": {
     "market_cap_priority": ["SMALL", "MID", "LARGE", "MEGA"],
@@ -357,8 +357,8 @@ PUT /api/scheduler/config
 Content-Type: application/json
 
 {
-  "cron_schedule": "0 3 * * *",  // Change to 3 AM
   "is_active": true,
+  "cron_schedule": "*/15 * * * *",  // Run every 15 minutes
   "market_cap_priority": ["SMALL", "MID"],  // Only small and mid caps
   "batch_size": 20,
   "analysis_interval_days": 60,  // Re-analyze every 60 days
@@ -1053,7 +1053,7 @@ python -m uvicorn src.main:app --reload
 # 2. Enable scheduler (via API or config)
 curl -X PUT http://localhost:8000/api/scheduler/config \
   -H "Content-Type: application/json" \
-  -d '{"is_active": true, "cron_schedule": "0 2 * * *"}'
+  -d '{"is_active": true, "cron_schedule": "*/15 * * * *"}'
 
 # 3. Trigger test run
 curl -X POST http://localhost:8000/api/scheduler/trigger
@@ -1061,7 +1061,7 @@ curl -X POST http://localhost:8000/api/scheduler/trigger
 # 4. Monitor status
 curl http://localhost:8000/api/scheduler/status
 
-# Done! Scheduler now runs daily at 2 AM automatically.
+# Done! Scheduler now runs every 15 minutes automatically.
 ```
 
 ---

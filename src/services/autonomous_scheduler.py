@@ -80,7 +80,7 @@ class AutonomousScheduler:
                 # Create default config
                 logger.info("Creating default scheduler configuration...")
                 scheduler_config = SchedulerConfig(
-                    cron_schedule="0 * * * *",  # Every 60 minutes (at minute 0)
+                    cron_schedule="*/15 * * * *",  # Every 15 minutes
                     is_active=True,  # Start active
                     market_cap_priority=["SMALL", "MID", "LARGE", "MEGA"],
                     batch_size=10,
@@ -411,26 +411,22 @@ class AutonomousScheduler:
             
             # Update company priorities
             logger.info("Updating company priorities...")
-            with get_db() as db:
-                await self.scheduler_agent.update_company_priorities(
-                    db,
-                    config_values["analysis_interval_days"]
-                )
+            await self.scheduler_agent.update_company_priorities(
+                config_values["analysis_interval_days"]
+            )
             
             # Use LLM agent to decide which companies to analyze
             if config_values["use_llm_agent"]:
                 logger.info("🤖 Using LLM agent for company selection...")
-                with get_db() as db:
-                    companies_to_analyze = await self.scheduler_agent.decide_companies_to_analyze(
-                        db,
-                        run_id,
-                        config_values["market_cap_priority"],
-                        config_values["batch_size"],
-                        config_values["analysis_interval_days"],
-                        config_values["prioritize_industries"],
-                        config_values["exclude_industries"],
-                        config_values["max_companies_per_run"]
-                    )
+                companies_to_analyze = await self.scheduler_agent.decide_companies_to_analyze(
+                    run_id,
+                    config_values["market_cap_priority"],
+                    config_values["batch_size"],
+                    config_values["analysis_interval_days"],
+                    config_values["prioritize_industries"],
+                    config_values["exclude_industries"],
+                    config_values["max_companies_per_run"]
+                )
             else:
                 # Fallback: simple rule-based selection
                 logger.info("Using rule-based company selection...")

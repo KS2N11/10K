@@ -34,7 +34,6 @@ class SchedulerAgent:
     
     async def decide_companies_to_analyze(
         self,
-        db: Session,
         run_id: str,
         market_cap_priority: List[str],
         batch_size: int,
@@ -47,7 +46,6 @@ class SchedulerAgent:
         Use LLM agent to decide which companies to analyze.
         
         Args:
-            db: Database session
             run_id: Scheduler run ID
             market_cap_priority: Priority order for market caps
             batch_size: Companies per batch
@@ -59,11 +57,12 @@ class SchedulerAgent:
         Returns:
             List of company dicts with {cik, name, ticker, reason, confidence}
         """
+        from src.database.database import get_db
+        
         logger.info(f"🤖 Scheduler agent deciding companies to analyze...")
         
         # Get candidate companies from SEC database
         candidates = await self._get_candidate_companies(
-            db,
             market_cap_priority,
             analysis_interval_days,
             prioritize_industries,
@@ -78,7 +77,8 @@ class SchedulerAgent:
             return []
         
         # Get historical context
-        memory_context = self._get_memory_context(db)
+        with get_db() as db:
+            memory_context = self._get_memory_context(db)
         
         # Build prompt for LLM
         prompt = self._build_decision_prompt(
@@ -103,43 +103,45 @@ class SchedulerAgent:
         decisions = self._parse_llm_decisions(response, candidates)
         
         # Log decisions to database
-        for decision in decisions:
-            self._log_decision(
-                db,
-                run_id,
-                decision["cik"],
-                decision["name"],
-                "analyze",
-                decision["reason"],
-                decision["reasoning"],
-                decision.get("confidence", 0.8),
-                decision.get("market_cap"),
-                decision.get("days_since_last_analysis"),
-                decision.get("previous_analysis_count", 0),
-                decision.get("previous_avg_match_score")
-            )
-        
-        # Log skipped companies
-        selected_ciks = {d["cik"] for d in decisions}
-        for candidate in candidates:
-            if candidate["cik"] not in selected_ciks:
+        with get_db() as db:
+            for decision in decisions:
                 self._log_decision(
                     db,
                     run_id,
-                    candidate["cik"],
-                    candidate["name"],
-                    "skip",
-                    ScheduleDecisionReason.PERIODIC_REFRESH,
-                    "Not selected by LLM in this batch",
-                    0.5,
-                    candidate.get("market_cap"),
-                    candidate.get("days_since_last_analysis"),
-                    candidate.get("previous_analysis_count", 0),
-                    candidate.get("previous_avg_match_score")
+                    decision["cik"],
+                    decision["name"],
+                    "analyze",
+                    decision["reason"],
+                    decision["reasoning"],
+                    decision.get("confidence", 0.8),
+                    decision.get("market_cap"),
+                    decision.get("days_since_last_analysis"),
+                    decision.get("previous_analysis_count", 0),
+                    decision.get("previous_avg_match_score")
                 )
+            
+            # Log skipped companies
+            selected_ciks = {d["cik"] for d in decisions}
+            for candidate in candidates:
+                if candidate["cik"] not in selected_ciks:
+                    self._log_decision(
+                        db,
+                        run_id,
+                        candidate["cik"],
+                        candidate["name"],
+                        "skip",
+                        ScheduleDecisionReason.PERIODIC_REFRESH,
+                        "Not selected by LLM in this batch",
+                        0.5,
+                        candidate.get("market_cap"),
+                        candidate.get("days_since_last_analysis"),
+                        candidate.get("previous_analysis_count", 0),
+                        candidate.get("previous_avg_match_score")
+                    )
         
         # Update memory with new learnings
-        self._update_memory(db, decisions, memory_context)
+        with get_db() as db:
+            self._update_memory(db, decisions, memory_context)
         
         logger.info(f"✅ LLM selected {len(decisions)} companies to analyze")
         
@@ -147,7 +149,6 @@ class SchedulerAgent:
     
     async def _get_candidate_companies(
         self,
-        db: Session,
         market_cap_priority: List[str],
         analysis_interval_days: int,
         prioritize_industries: Optional[List[str]],
@@ -156,6 +157,7 @@ class SchedulerAgent:
     ) -> List[Dict[str, Any]]:
         """Get candidate companies for analysis based on priority rules."""
         from src.utils.sec_filter import SECCompanyFilter
+        from src.database.database import get_db
         
         candidates = []
         
@@ -177,21 +179,30 @@ class SchedulerAgent:
             for company in companies:
                 cik = company.get("cik")
                 
-                # Check if company exists in database
-                db_company = CompanyRepository.get_by_cik(db, cik)
-                
-                # Get latest analysis
-                latest_analysis = None
-                days_since = None
-                if db_company:
-                    latest_analysis = AnalysisRepository.get_latest_for_company(db, db_company.id)
-                    if latest_analysis and latest_analysis.completed_at:
-                        days_since = (datetime.utcnow() - latest_analysis.completed_at).days
-                
-                # Get priority record
-                priority = db.query(CompanyPriority).filter(
-                    CompanyPriority.cik == cik
-                ).first()
+                with get_db() as db:
+                    # Check if company exists in database
+                    db_company = CompanyRepository.get_by_cik(db, cik)
+                    
+                    # Get latest analysis
+                    latest_analysis = None
+                    days_since = None
+                    if db_company:
+                        latest_analysis = AnalysisRepository.get_latest_for_company(db, db_company.id)
+                        if latest_analysis and latest_analysis.completed_at:
+                            days_since = (datetime.utcnow() - latest_analysis.completed_at).days
+                    
+                    # Get priority record
+                    priority = db.query(CompanyPriority).filter(
+                        CompanyPriority.cik == cik
+                    ).first()
+                    
+                    # Extract priority data before leaving session
+                    priority_data = {
+                        'times_analyzed': priority.times_analyzed if priority else 0,
+                        'avg_product_match_score': priority.avg_product_match_score if priority else None,
+                        'has_high_value_matches': priority.has_high_value_matches if priority else False,
+                        'priority_score': priority.priority_score if priority else 50.0
+                    }
                 
                 # Determine if company should be considered
                 should_consider = False
@@ -222,11 +233,11 @@ class SchedulerAgent:
                         "industry": company.get("industry"),
                         "sector": company.get("sector"),
                         "days_since_last_analysis": days_since,
-                        "previous_analysis_count": priority.times_analyzed if priority else 0,
-                        "previous_avg_match_score": priority.avg_product_match_score if priority else None,
-                        "has_high_value_matches": priority.has_high_value_matches if priority else False,
+                        "previous_analysis_count": priority_data['times_analyzed'],
+                        "previous_avg_match_score": priority_data['avg_product_match_score'],
+                        "has_high_value_matches": priority_data['has_high_value_matches'],
                         "reason": reason,
-                        "priority_score": priority.priority_score if priority else 50.0
+                        "priority_score": priority_data['priority_score']
                     })
             
             if len(candidates) >= limit:
@@ -554,95 +565,96 @@ Return valid JSON only.
     
     async def update_company_priorities(
         self,
-        db: Session,
         analysis_interval_days: int = 90
     ):
         """Update company priority scores based on recent analyses."""
         from src.database.models import Company, Analysis, ProductMatch
+        from src.database.database import get_db
         
         logger.info("Updating company priorities...")
         
-        # Get all companies with at least one analysis
-        companies = db.query(Company).join(Analysis).group_by(Company.id).all()
-        
-        for company in companies:
-            # Get latest analysis
-            latest_analysis = AnalysisRepository.get_latest_for_company(db, company.id)
+        with get_db() as db:
+            # Get all companies with at least one analysis
+            companies = db.query(Company).join(Analysis).group_by(Company.id).all()
             
-            if not latest_analysis:
-                continue
+            for company in companies:
+                # Get latest analysis
+                latest_analysis = AnalysisRepository.get_latest_for_company(db, company.id)
+                
+                if not latest_analysis:
+                    continue
+                
+                # Calculate metrics
+                analyses = db.query(Analysis).filter(
+                    Analysis.company_id == company.id,
+                    Analysis.status == AnalysisStatus.COMPLETED
+                ).all()
+                
+                times_analyzed = len(analyses)
+                last_analyzed_at = latest_analysis.completed_at
+                
+                # Calculate average match score
+                all_matches = db.query(ProductMatch).join(Analysis).filter(
+                    Analysis.company_id == company.id
+                ).all()
+                
+                avg_score = sum(m.fit_score for m in all_matches) / len(all_matches) if all_matches else 0
+                has_high_value = any(m.fit_score >= 80 for m in all_matches)
+                total_pains = sum(len(a.pain_points) for a in analyses)
+                
+                # Calculate next scheduled time
+                next_scheduled = last_analyzed_at + timedelta(days=analysis_interval_days) if last_analyzed_at else datetime.utcnow()
+                
+                # Calculate priority score (0-100)
+                priority_score = 50.0  # Base score
+                
+                # Boost for high value matches
+                if has_high_value:
+                    priority_score += 25
+                elif avg_score > 70:
+                    priority_score += 15
+                
+                # Boost for more pain points found
+                if total_pains > 10:
+                    priority_score += 10
+                
+                # Reduce for frequent analyses (don't analyze too often)
+                if times_analyzed > 3:
+                    priority_score -= 10
+                
+                # Determine reason
+                days_since = (datetime.utcnow() - last_analyzed_at).days if last_analyzed_at else 999
+                if days_since >= analysis_interval_days:
+                    reason = ScheduleDecisionReason.STALE_DATA
+                elif has_high_value:
+                    reason = ScheduleDecisionReason.HIGH_PRIORITY
+                else:
+                    reason = ScheduleDecisionReason.PERIODIC_REFRESH
+                
+                # Update or create priority record
+                priority = db.query(CompanyPriority).filter(
+                    CompanyPriority.cik == company.cik
+                ).first()
+                
+                if not priority:
+                    priority = CompanyPriority(
+                        cik=company.cik,
+                        company_name=company.name
+                    )
+                    db.add(priority)
+                
+                priority.market_cap = company.market_cap
+                priority.industry = company.industry
+                priority.sector = company.sector
+                priority.times_analyzed = times_analyzed
+                priority.last_analyzed_at = last_analyzed_at
+                priority.next_scheduled_at = next_scheduled
+                priority.priority_score = priority_score
+                priority.priority_reason = reason
+                priority.avg_product_match_score = avg_score
+                priority.total_pain_points_found = total_pains
+                priority.has_high_value_matches = has_high_value
+                priority.last_priority_update = datetime.utcnow()
             
-            # Calculate metrics
-            analyses = db.query(Analysis).filter(
-                Analysis.company_id == company.id,
-                Analysis.status == AnalysisStatus.COMPLETED
-            ).all()
-            
-            times_analyzed = len(analyses)
-            last_analyzed_at = latest_analysis.completed_at
-            
-            # Calculate average match score
-            all_matches = db.query(ProductMatch).join(Analysis).filter(
-                Analysis.company_id == company.id
-            ).all()
-            
-            avg_score = sum(m.fit_score for m in all_matches) / len(all_matches) if all_matches else 0
-            has_high_value = any(m.fit_score >= 80 for m in all_matches)
-            total_pains = sum(len(a.pain_points) for a in analyses)
-            
-            # Calculate next scheduled time
-            next_scheduled = last_analyzed_at + timedelta(days=analysis_interval_days) if last_analyzed_at else datetime.utcnow()
-            
-            # Calculate priority score (0-100)
-            priority_score = 50.0  # Base score
-            
-            # Boost for high value matches
-            if has_high_value:
-                priority_score += 25
-            elif avg_score > 70:
-                priority_score += 15
-            
-            # Boost for more pain points found
-            if total_pains > 10:
-                priority_score += 10
-            
-            # Reduce for frequent analyses (don't analyze too often)
-            if times_analyzed > 3:
-                priority_score -= 10
-            
-            # Determine reason
-            days_since = (datetime.utcnow() - last_analyzed_at).days if last_analyzed_at else 999
-            if days_since >= analysis_interval_days:
-                reason = ScheduleDecisionReason.STALE_DATA
-            elif has_high_value:
-                reason = ScheduleDecisionReason.HIGH_PRIORITY
-            else:
-                reason = ScheduleDecisionReason.PERIODIC_REFRESH
-            
-            # Update or create priority record
-            priority = db.query(CompanyPriority).filter(
-                CompanyPriority.cik == company.cik
-            ).first()
-            
-            if not priority:
-                priority = CompanyPriority(
-                    cik=company.cik,
-                    company_name=company.name
-                )
-                db.add(priority)
-            
-            priority.market_cap = company.market_cap
-            priority.industry = company.industry
-            priority.sector = company.sector
-            priority.times_analyzed = times_analyzed
-            priority.last_analyzed_at = last_analyzed_at
-            priority.next_scheduled_at = next_scheduled
-            priority.priority_score = priority_score
-            priority.priority_reason = reason
-            priority.avg_product_match_score = avg_score
-            priority.total_pain_points_found = total_pains
-            priority.has_high_value_matches = has_high_value
-            priority.last_priority_update = datetime.utcnow()
-        
-        db.commit()
-        logger.info(f"✅ Updated priorities for {len(companies)} companies")
+            db.commit()
+            logger.info(f"✅ Updated priorities for {len(companies)} companies")

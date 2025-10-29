@@ -139,8 +139,8 @@ class BatchAnalysisService:
         
         for i, company_data in enumerate(companies):
             try:
+                # Update job progress first
                 with get_db() as db:
-                    # Update job progress
                     remaining = len(companies) - i
                     elapsed = (datetime.utcnow() - start_time).total_seconds()
                     avg_time = elapsed / max(i, 1)
@@ -153,7 +153,12 @@ class BatchAnalysisService:
                         current_step="Initializing",
                         estimated_time_remaining=eta
                     )
-                    
+                
+                # Get or create company and check if analysis needed
+                company_id = None
+                should_analyze = True
+                
+                with get_db() as db:
                     # Get or create company
                     company = CompanyRepository.get_or_create(
                         db,
@@ -161,6 +166,7 @@ class BatchAnalysisService:
                         name=company_data.get("name"),
                         ticker=company_data.get("ticker")
                     )
+                    company_id = company.id
                     
                     # Check if analysis needed (caching logic)
                     catalog_hash = get_catalog_hash()
@@ -180,41 +186,45 @@ class BatchAnalysisService:
                                 if pain_count > 0:
                                     logger.info(f"⏭️  Skipping {company.name} - already analyzed with current catalog ({pain_count} pain points)")
                                     skipped += 1
-                                    
-                                    # Update progress
-                                    AnalysisJobRepository.update_progress(
-                                        db,
-                                        job_id,
-                                        completed_count=completed,
-                                        failed_count=failed,
-                                        skipped_count=skipped,
-                                        total_tokens_used=total_tokens
-                                    )
-                                    continue
+                                    should_analyze = False
                                 else:
                                     logger.warning(f"🔄 Re-analyzing {company.name} - previous analysis had no pain points")
                     else:
                         logger.info(f"🔄 Force re-analyzing {company.name}")
-                    
-                    # Run analysis
-                    result = await self._analyze_company(
+                
+                # Update progress
+                with get_db() as db:
+                    AnalysisJobRepository.update_progress(
                         db,
                         job_id,
-                        company.id,
-                        company.cik,
-                        company.name,
-                        catalog_hash
+                        completed_count=completed,
+                        failed_count=failed,
+                        skipped_count=skipped,
+                        total_tokens_used=total_tokens
                     )
+                
+                if not should_analyze:
+                    continue
                     
-                    if result["status"] == "completed":
-                        completed += 1
-                        total_tokens += result.get("tokens_used", 0)
-                    elif result["status"] == "skipped":
-                        skipped += 1
-                    else:
-                        failed += 1
-                    
-                    # Update job progress
+                # Run analysis (this is the long-running part)
+                result = await self._analyze_company(
+                    job_id,
+                    company_id,
+                    company_data.get("cik"),
+                    company_data.get("name"),
+                    catalog_hash
+                )
+                
+                if result["status"] == "completed":
+                    completed += 1
+                    total_tokens += result.get("tokens_used", 0)
+                elif result["status"] == "skipped":
+                    skipped += 1
+                else:
+                    failed += 1
+                
+                # Update job progress
+                with get_db() as db:
                     AnalysisJobRepository.update_progress(
                         db,
                         job_id,
@@ -245,7 +255,6 @@ class BatchAnalysisService:
     
     async def _analyze_company(
         self,
-        db: Session,
         job_id: str,
         company_id: int,
         cik: str,
@@ -256,7 +265,6 @@ class BatchAnalysisService:
         Analyze a single company.
         
         Args:
-            db: Database session
             job_id: Parent job ID
             company_id: Company database ID
             cik: Company CIK
@@ -271,11 +279,12 @@ class BatchAnalysisService:
             analysis_start_time = datetime.utcnow()
             
             # Update job current step
-            AnalysisJobRepository.update_progress(
-                db,
-                job_id,
-                current_step="Fetching 10-K"
-            )
+            with get_db() as db:
+                AnalysisJobRepository.update_progress(
+                    db,
+                    job_id,
+                    current_step="Fetching 10-K"
+                )
             
             # Build DAG
             dag_app = create_dag()
@@ -325,76 +334,84 @@ class BatchAnalysisService:
                 return {"status": "skipped", "reason": "cached"}
             
             # Create analysis record
-            analysis = AnalysisRepository.create(
-                db,
-                company_id=company_id,
-                filing_date=filing_date,
-                accession_number=accession,
-                filing_path=filing_path,
-                status=AnalysisStatus.IN_PROGRESS,
-                started_at=analysis_start_time,  # Explicit start time
-                catalog_hash=catalog_hash,
-                used_cached_filing=result.get("cached_filing", False),
-                used_cached_embeddings=result.get("cached_embeddings", False)
-            )
+            analysis_id = None
+            with get_db() as db:
+                analysis = AnalysisRepository.create(
+                    db,
+                    company_id=company_id,
+                    filing_date=filing_date,
+                    accession_number=accession,
+                    filing_path=filing_path,
+                    status=AnalysisStatus.IN_PROGRESS,
+                    started_at=analysis_start_time,  # Explicit start time
+                    catalog_hash=catalog_hash,
+                    used_cached_filing=result.get("cached_filing", False),
+                    used_cached_embeddings=result.get("cached_embeddings", False)
+                )
+                analysis_id = analysis.id
             
             # Save pain points
             pains = result.get("pains", [])
+            pain_objs = []
             if pains:
-                pain_data = [
-                    {
-                        "theme": p.get("theme", ""),
-                        "rationale": p.get("rationale", ""),
-                        "confidence": p.get("confidence", 0.0),
-                        "quotes": p.get("quotes", [])
-                    }
-                    for p in pains
-                ]
-                pain_objs = PainPointRepository.create_bulk(db, analysis.id, pain_data)
+                with get_db() as db:
+                    pain_data = [
+                        {
+                            "theme": p.get("theme", ""),
+                            "rationale": p.get("rationale", ""),
+                            "confidence": p.get("confidence", 0.0),
+                            "quotes": p.get("quotes", [])
+                        }
+                        for p in pains
+                    ]
+                    pain_objs = PainPointRepository.create_bulk(db, analysis_id, pain_data)
             
             # Save product matches
             matches = result.get("matches", [])
+            match_objs = []
             if matches:
-                # Create a mapping from pain theme to pain point ID
-                pain_theme_to_id = {p.theme: p.id for p in pain_objs} if pain_objs else {}
-                
-                match_data = []
-                for m in matches:
-                    # Try to find matching pain point by theme
-                    pain_theme = m.get("pain_theme", "")
-                    pain_point_id = pain_theme_to_id.get(pain_theme)
+                with get_db() as db:
+                    # Create a mapping from pain theme to pain point ID
+                    pain_theme_to_id = {p.theme: p.id for p in pain_objs} if pain_objs else {}
                     
-                    # Fallback to first pain point if theme not found
-                    if not pain_point_id and pain_objs:
-                        pain_point_id = pain_objs[0].id
+                    match_data = []
+                    for m in matches:
+                        # Try to find matching pain point by theme
+                        pain_theme = m.get("pain_theme", "")
+                        pain_point_id = pain_theme_to_id.get(pain_theme)
+                        
+                        # Fallback to first pain point if theme not found
+                        if not pain_point_id and pain_objs:
+                            pain_point_id = pain_objs[0].id
+                        
+                        match_data.append({
+                            "pain_point_id": pain_point_id,
+                            "product_id": m.get("product_id", ""),
+                            "product_name": m.get("product_name", m.get("product_id", "")),  # Use product_name if available
+                            "fit_score": m.get("score", 0),
+                            "why_fits": m.get("why", ""),
+                            "evidence": m.get("evidence", []),
+                            "potential_objections": m.get("objections", [])
+                        })
                     
-                    match_data.append({
-                        "pain_point_id": pain_point_id,
-                        "product_id": m.get("product_id", ""),
-                        "product_name": m.get("product_name", m.get("product_id", "")),  # Use product_name if available
-                        "fit_score": m.get("score", 0),
-                        "why_fits": m.get("why", ""),
-                        "evidence": m.get("evidence", []),
-                        "potential_objections": m.get("objections", [])
-                    })
-                
-                match_objs = ProductMatchRepository.create_bulk(db, analysis.id, match_data)
+                    match_objs = ProductMatchRepository.create_bulk(db, analysis_id, match_data)
             
             # Save pitch
             pitch = result.get("pitch", {})
             if pitch and match_objs:
-                pitch_data = [
-                    {
-                        "analysis_id": analysis.id,
-                        "product_match_id": match_objs[0].id,  # Top match
-                        "persona": pitch.get("persona", "Executive"),
-                        "subject": pitch.get("subject", ""),
-                        "body": pitch.get("body", ""),
-                        "key_quotes": pitch.get("key_quotes", []),
-                        "overall_score": match_objs[0].fit_score
-                    }
-                ]
-                PitchRepository.create_bulk(db, pitch_data)
+                with get_db() as db:
+                    pitch_data = [
+                        {
+                            "analysis_id": analysis_id,
+                            "product_match_id": match_objs[0].id,  # Top match
+                            "persona": pitch.get("persona", "Executive"),
+                            "subject": pitch.get("subject", ""),
+                            "body": pitch.get("body", ""),
+                            "key_quotes": pitch.get("key_quotes", []),
+                            "overall_score": match_objs[0].fit_score
+                        }
+                    ]
+                    PitchRepository.create_bulk(db, pitch_data)
             
             # Calculate time taken
             analysis_end_time = datetime.utcnow()
@@ -406,17 +423,18 @@ class BatchAnalysisService:
                 logger.error(error_msg)
                 
                 # Mark as FAILED if no data extracted
-                AnalysisRepository.update_status(
-                    db,
-                    analysis.id,
-                    AnalysisStatus.FAILED,
-                    error_message=error_msg
-                )
+                with get_db() as db:
+                    AnalysisRepository.update_status(
+                        db,
+                        analysis_id,
+                        AnalysisStatus.FAILED,
+                        error_message=error_msg
+                    )
                 
                 return {
                     "status": "failed",
                     "error": error_msg,
-                    "analysis_id": analysis.id
+                    "analysis_id": analysis_id
                 }
             
             # Calculate tokens (from trace or estimate)
@@ -443,12 +461,13 @@ class BatchAnalysisService:
             # Update analysis as completed with metrics
             # Note: time_taken_seconds is calculated automatically by update_status
             # based on started_at and completed_at, but we can also set it explicitly
-            AnalysisRepository.update_status(
-                db,
-                analysis.id,
-                AnalysisStatus.COMPLETED,
-                total_tokens_used=total_tokens
-            )
+            with get_db() as db:
+                AnalysisRepository.update_status(
+                    db,
+                    analysis_id,
+                    AnalysisStatus.COMPLETED,
+                    total_tokens_used=total_tokens
+                )
             
             logger.info(f"✅ Completed analysis for {company_name} in {time_taken:.2f}s using {total_tokens} tokens - {len(pains)} pain points, {len(matches)} matches")
             
@@ -456,22 +475,23 @@ class BatchAnalysisService:
                 "status": "completed",
                 "tokens_used": total_tokens,
                 "time_taken": time_taken,
-                "analysis_id": analysis.id
+                "analysis_id": analysis_id
             }
         
         except Exception as e:
             logger.error(f"Error analyzing {company_name}: {e}")
             
             # Create failed analysis record
-            analysis = AnalysisRepository.create(
-                db,
-                company_id=company_id,
-                filing_date=datetime.utcnow(),
-                accession_number="",
-                status=AnalysisStatus.FAILED,
-                error_message=str(e),
-                catalog_hash=catalog_hash
-            )
+            with get_db() as db:
+                analysis = AnalysisRepository.create(
+                    db,
+                    company_id=company_id,
+                    filing_date=datetime.utcnow(),
+                    accession_number="",
+                    status=AnalysisStatus.FAILED,
+                    error_message=str(e),
+                    catalog_hash=catalog_hash
+                )
             
             return {
                 "status": "failed",
