@@ -6,7 +6,7 @@ from typing import Optional, Dict, Any, List, Literal, Union
 import time
 import os
 
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langchain_groq import ChatGroq
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage
@@ -15,7 +15,7 @@ from ..utils.logging import setup_logger
 
 logger = setup_logger(__name__)
 
-ProviderType = Literal["openai", "groq"]
+ProviderType = Literal["openai", "groq", "azure"]
 
 
 class RateLimiter:
@@ -96,14 +96,47 @@ class MultiProviderLLM:
     
     def _initialize_llms(self):
         """Initialize all configured LLM providers."""
+        # Auto-detect which provider to use based on available API keys
+        openai_key = self.config.get("openai_api_key") or os.getenv("OPENAI_API_KEY")
+        groq_key = self.config.get("groq_api_key") or os.getenv("GROQ_API_KEY")
+        azure_key = self.config.get("azure_api_key") or os.getenv("AZURE_OPENAI_API_KEY")
+        azure_endpoint = self.config.get("azure_endpoint") or os.getenv("AZURE_OPENAI_ENDPOINT")
+        
+        # Priority: Azure OpenAI > OpenAI > Groq
+        if azure_key and azure_endpoint and self.primary_provider == "groq":
+            logger.info("🔄 AZURE_OPENAI_API_KEY detected - switching to Azure OpenAI as primary provider")
+            self.primary_provider = "azure"
+            # Keep groq as fallback if available
+            if groq_key and "groq" not in self.fallback_providers:
+                self.fallback_providers = ["groq"] + self.fallback_providers
+            if openai_key and "openai" not in self.fallback_providers:
+                self.fallback_providers = ["openai"] + self.fallback_providers
+        elif openai_key and self.primary_provider == "groq":
+            logger.info("🔄 OPENAI_API_KEY detected - switching to OpenAI as primary provider")
+            self.primary_provider = "openai"
+            # Keep groq as fallback if available
+            if groq_key and "groq" not in self.fallback_providers:
+                self.fallback_providers = ["groq"] + self.fallback_providers
+        
         providers_to_init = [self.primary_provider] + self.fallback_providers
         
         for provider in providers_to_init:
             try:
                 if provider == "groq":
+                    if not groq_key:
+                        logger.warning(f"⚠️  Skipping {provider} - API key not found")
+                        continue
                     self._llms[provider] = self._init_groq()
                 elif provider == "openai":
+                    if not openai_key:
+                        logger.warning(f"⚠️  Skipping {provider} - API key not found")
+                        continue
                     self._llms[provider] = self._init_openai()
+                elif provider == "azure":
+                    if not azure_key or not azure_endpoint:
+                        logger.warning(f"⚠️  Skipping {provider} - API key or endpoint not found")
+                        continue
+                    self._llms[provider] = self._init_azure()
                 
                 # Initialize rate limiter
                 limits = self.rate_limits.get(provider, {"rpm": 60, "tpm": 10000})
@@ -127,7 +160,7 @@ class MultiProviderLLM:
         
         return ChatGroq(
             api_key=api_key,
-            model=groq_config.get("model_name", "llama-3.3-70b-versatile"),
+            model=groq_config.get("model_name", "openai/gpt-oss-120b"),
             temperature=groq_config.get("temperature", 0.7),
             max_tokens=groq_config.get("max_tokens", 4096),
         )
@@ -146,6 +179,40 @@ class MultiProviderLLM:
             model=openai_config.get("model_name", "gpt-4o-mini"),
             temperature=openai_config.get("temperature", 0.7),
             max_tokens=openai_config.get("max_tokens", 4096),
+        )
+    
+    def _init_azure(self) -> AzureChatOpenAI:
+        """Initialize Azure OpenAI LLM."""
+        azure_config = self.config.get("azure", {})
+        
+        # Check if API key and endpoint are available
+        api_key = self.config.get("azure_api_key") or os.getenv("AZURE_OPENAI_API_KEY")
+        endpoint = self.config.get("azure_endpoint") or os.getenv("AZURE_OPENAI_ENDPOINT")
+        
+        if not api_key or not endpoint:
+            raise ValueError("AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT required")
+        
+        # Azure deployment name (defaults to model name)
+        deployment_name = (
+            self.config.get("azure_deployment") or 
+            os.getenv("AZURE_OPENAI_DEPLOYMENT") or 
+            azure_config.get("model_name", "gpt-4o-mini")
+        )
+        
+        # API version
+        api_version = (
+            self.config.get("azure_api_version") or 
+            os.getenv("AZURE_OPENAI_API_VERSION") or 
+            "2024-02-15-preview"
+        )
+        
+        return AzureChatOpenAI(
+            azure_endpoint=endpoint,
+            api_key=api_key,
+            api_version=api_version,
+            azure_deployment=deployment_name,
+            temperature=azure_config.get("temperature", 0.7),
+            max_tokens=azure_config.get("max_tokens", 4096),
         )
     
     async def ainvoke(
