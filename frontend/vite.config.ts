@@ -12,6 +12,12 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    allowedHosts: [
+      'localhost',
+      '127.0.0.1',
+      'agent10k-frontend.ambitiousground-7c789fbb.eastus.azurecontainerapps.io',
+      '.azurecontainerapps.io' // Allow all Azure Container Apps domains
+    ],
     proxy: {
       '/api': {
         target: 'http://localhost:8000',
