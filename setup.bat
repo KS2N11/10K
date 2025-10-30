@@ -29,7 +29,7 @@ echo [2/5] Setting up configuration files...
 if not exist .env (
     echo Creating .env from template...
     copy .env.example .env
-    echo IMPORTANT: Please edit .env and add your OPENAI_API_KEY and SEC_USER_AGENT
+    echo IMPORTANT: Please edit .env and add your API keys and SEC_USER_AGENT
 ) else (
     echo .env already exists, skipping...
 )
@@ -71,11 +71,12 @@ echo.
 echo ========================================
 echo Next Steps:
 echo ========================================
-echo 1. Edit .env and add your OPENAI_API_KEY
-echo 2. Edit .env and add your SEC_USER_AGENT (email required)
-echo 3. Edit src\configs\settings.yaml with your preferences
-echo 4. Run the API: scripts\dev_run.bat
-echo 5. Run the UI: uv run streamlit run streamlit_app.py
+echo 1. Edit .env and configure PRIMARY_LLM_PROVIDER (groq, openai, or azure)
+echo 2. Add API keys for your chosen provider (GROQ_API_KEY, OPENAI_API_KEY, etc.)
+echo 3. Edit .env and add your SEC_USER_AGENT (email required)
+echo 4. Edit src\configs\settings.yaml with your preferences
+echo 5. Run the API: scripts\dev_run.bat
+echo 6. Run the UI: uv run streamlit run streamlit_app.py
 echo.
 echo For detailed instructions, see SETUP_GUIDE.md
 echo ========================================

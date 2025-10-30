@@ -3,113 +3,45 @@ FastAPI routes for the 10K Insight Agent API.
 """
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional, Dict, Any
-import yaml
 from pathlib import Path
-import os
-from dotenv import load_dotenv
 
 from ..graph.dag import dag_app
 from ..utils.logging import setup_logger
-from ..utils.multi_llm import create_llm_manager
-from ..utils.multi_embeddings import MultiProviderEmbeddings
+from ..utils.llm_factory import get_factory
 
 logger = setup_logger(__name__)
 
 router = APIRouter()
 
-# Global managers (initialized once)
-_llm_manager = None
-_embedder = None
+# Global factory instance (initialized once)
+_factory = None
+
+
+def get_llm_factory():
+    """Get or create the global LLM factory singleton."""
+    global _factory
+    if _factory is None:
+        logger.info("🏭 Initializing LLM Factory...")
+        _factory = get_factory()
+    return _factory
 
 
 def load_config() -> Dict[str, Any]:
-    """Load configuration from settings.yaml."""
-    config_path = Path("src/configs/settings.yaml")
-    
-    # Load environment variables
-    load_dotenv()
-    
-    if not config_path.exists():
-        logger.warning("settings.yaml not found, using defaults")
-        
-        return {
-            "openai_api_key": os.getenv("OPENAI_API_KEY"),
-            "groq_api_key": os.getenv("GROQ_API_KEY"),
-            "cohere_api_key": os.getenv("COHERE_API_KEY"),
-            "sec_user_agent": os.getenv("SEC_USER_AGENT"),
-            "vector_store_dir": os.getenv("VECTOR_STORE_DIR", "src/stores/vector"),
-            "catalog_store_dir": os.getenv("CATALOG_STORE_DIR", "src/stores/catalog"),
-            "embedding": {
-                "primary_provider": os.getenv("PRIMARY_EMBEDDING_PROVIDER", "sentence-transformers"),
-                "fallback_providers": ["openai"],
-                "sentence_transformers": {
-                    "model_name": "all-mpnet-base-v2",
-                    "device": "cpu"
-                },
-                "openai": {
-                    "model_name": "text-embedding-3-large"
-                }
-            },
-            "llm": {
-                "primary_provider": os.getenv("PRIMARY_LLM_PROVIDER", "groq"),
-                "fallback_providers": ["openai"],
-                "groq": {
-                    "model_name": "llama-3.3-70b-versatile",
-                    "temperature": 0.7,
-                    "max_tokens": 4096
-                },
-                "openai": {
-                    "model_name": "gpt-4o-mini",
-                    "temperature": 0.7,
-                    "max_tokens": 4096
-                }
-            },
-            "rate_limits": {
-                "groq": {"rpm": 30, "tpm": 7000},
-                "openai": {"rpm": 3500, "tpm": 90000}
-            },
-            "chunk_size": 1000,
-            "chunk_overlap": 200,
-            "top_k_chunks": 10,
-            "top_k_products": 6,
-            "max_iterations": 3,
-            "min_confidence": 0.6,
-            "log_level": "INFO"
-        }
-    
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-    
-    # Set API keys from environment (they override config file)
-    config["openai_api_key"] = os.getenv("OPENAI_API_KEY", config.get("openai_api_key"))
-    config["groq_api_key"] = os.getenv("GROQ_API_KEY", config.get("groq_api_key"))
-    config["cohere_api_key"] = os.getenv("COHERE_API_KEY", config.get("cohere_api_key"))
-    config["sec_user_agent"] = os.getenv("SEC_USER_AGENT", config.get("sec_user_agent"))
-    
-    return config
+    """Load configuration via the LLM factory."""
+    factory = get_llm_factory()
+    return factory.get_config()
 
 
-def get_llm_manager(config: Dict[str, Any]):
-    """Get or create LLM manager singleton."""
-    global _llm_manager
-    if _llm_manager is None:
-        logger.info("🚀 Initializing multi-provider LLM manager...")
-        _llm_manager = create_llm_manager(config)
-    return _llm_manager
+def get_llm_manager():
+    """Get or create LLM manager from the factory."""
+    factory = get_llm_factory()
+    return factory.create_llm_manager()
 
 
-def get_embedder(config: Dict[str, Any]):
-    """Get or create embedder singleton."""
-    global _embedder
-    if _embedder is None:
-        logger.info("🚀 Initializing multi-provider embeddings...")
-        emb_config = config.get("embedding", {})
-        _embedder = MultiProviderEmbeddings(
-            primary_provider=emb_config.get("primary_provider", "sentence-transformers"),
-            fallback_providers=emb_config.get("fallback_providers", []),
-            config=emb_config,
-        )
-    return _embedder
+def get_embedder():
+    """Get or create embedder from the factory."""
+    factory = get_llm_factory()
+    return factory.create_embedder()
 
 
 @router.get("/")

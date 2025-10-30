@@ -8,6 +8,7 @@ import chromadb
 from chromadb.config import Settings
 
 from ...utils.logging import setup_logger, log_trace_event
+from ...utils.chromadb_utils import create_chromadb_client
 
 logger = setup_logger(__name__)
 
@@ -48,13 +49,9 @@ async def product_retriever_node(state: Dict[str, Any]) -> Dict[str, Any]:
         # If we have pains, use vector search to find relevant products
         if pains and products and embedder:
             catalog_store_dir = Path(config.get("catalog_store_dir", "src/stores/catalog"))
-            catalog_store_dir.mkdir(parents=True, exist_ok=True)
             
-            # Initialize Chroma client
-            client = chromadb.PersistentClient(
-                path=str(catalog_store_dir),
-                settings=Settings(anonymized_telemetry=False),
-            )
+            # Initialize Chroma client with auto-recovery
+            client = create_chromadb_client(catalog_store_dir, auto_recover=True, max_retries=2)
             
             # Check if catalog collection exists
             try:

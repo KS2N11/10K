@@ -3,11 +3,10 @@ Embedder node - processes filing text and creates vector embeddings.
 """
 from typing import Dict, Any
 from pathlib import Path
-import chromadb
-from chromadb.config import Settings
 
 from ..utils.text_utils import TextProcessor
 from ..utils.logging import setup_logger, log_trace_event
+from ..utils.chromadb_utils import create_chromadb_client
 
 logger = setup_logger(__name__)
 
@@ -53,10 +52,8 @@ async def embedder_node(state: Dict[str, Any]) -> Dict[str, Any]:
         safe_company = "".join(c for c in safe_company if c.isalnum() or c in "_-")
         collection_name = f"filing_{safe_company}"
         
-        client = chromadb.PersistentClient(
-            path=str(vector_store_dir),
-            settings=Settings(anonymized_telemetry=False),
-        )
+        # Initialize ChromaDB client with automatic corruption recovery
+        client = create_chromadb_client(vector_store_dir, auto_recover=True, max_retries=2)
         
         # Check if collection already exists and is up to date
         use_cached_embeddings = False

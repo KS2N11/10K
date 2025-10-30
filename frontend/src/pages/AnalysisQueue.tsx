@@ -26,6 +26,27 @@ const AnalysisQueue: React.FC = () => {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [loadingSearch, setLoadingSearch] = useState(false);
 
+  // Fetch active jobs on mount and periodically
+  useEffect(() => {
+    const fetchActiveJobs = async () => {
+      try {
+        const response = await apiClient.getAllJobs(false); // Only active jobs
+        const jobIds = response.jobs.map(job => job.job_id);
+        setActiveJobs(jobIds);
+      } catch (err) {
+        console.error('Failed to fetch active jobs:', err);
+      }
+    };
+
+    // Fetch on mount
+    fetchActiveJobs();
+
+    // Refresh active jobs every 10 seconds
+    const interval = setInterval(fetchActiveJobs, 10000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   const startBatchJob = async (params: { 
     company_names?: string[]; 
     filters?: any; 

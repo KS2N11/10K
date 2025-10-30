@@ -17,8 +17,6 @@ from src.utils.catalog import get_catalog_hash
 from src.utils.sec_filter import get_companies_by_names, SECCompanyFilter
 from src.utils.logging import get_logger
 from src.graph.dag import create_dag
-from src.utils.multi_llm import MultiProviderLLM
-from src.utils.multi_embeddings import MultiProviderEmbeddings
 
 logger = get_logger(__name__)
 
@@ -39,11 +37,16 @@ class BatchAnalysisService:
     
     async def _init_providers(self):
         """Initialize LLM and embedding providers if not already done."""
+        from src.utils.llm_factory import get_factory
+        
+        # Use centralized factory for LLM and embeddings
+        factory = get_factory()
+        
         if not self.llm_manager:
-            self.llm_manager = MultiProviderLLM(config=self.config)
+            self.llm_manager = factory.create_llm_manager()
         
         if not self.embedder:
-            self.embedder = MultiProviderEmbeddings(config=self.config)
+            self.embedder = factory.create_embedder()
     
     async def start_batch_job(
         self,
@@ -353,6 +356,8 @@ class BatchAnalysisService:
             # Save pain points
             pains = result.get("pains", [])
             pain_objs = []
+            pain_theme_to_id = {}
+            first_pain_id = None
             if pains:
                 with get_db() as db:
                     pain_data = [
@@ -365,14 +370,16 @@ class BatchAnalysisService:
                         for p in pains
                     ]
                     pain_objs = PainPointRepository.create_bulk(db, analysis_id, pain_data)
+                    # Extract IDs and themes while still in session
+                    pain_theme_to_id = {p.theme: p.id for p in pain_objs}
+                    first_pain_id = pain_objs[0].id if pain_objs else None
             
             # Save product matches
             matches = result.get("matches", [])
             match_objs = []
+            first_match_id = None
             if matches:
                 with get_db() as db:
-                    # Create a mapping from pain theme to pain point ID
-                    pain_theme_to_id = {p.theme: p.id for p in pain_objs} if pain_objs else {}
                     
                     match_data = []
                     for m in matches:
@@ -381,8 +388,8 @@ class BatchAnalysisService:
                         pain_point_id = pain_theme_to_id.get(pain_theme)
                         
                         # Fallback to first pain point if theme not found
-                        if not pain_point_id and pain_objs:
-                            pain_point_id = pain_objs[0].id
+                        if not pain_point_id and first_pain_id:
+                            pain_point_id = first_pain_id
                         
                         match_data.append({
                             "pain_point_id": pain_point_id,
@@ -395,20 +402,25 @@ class BatchAnalysisService:
                         })
                     
                     match_objs = ProductMatchRepository.create_bulk(db, analysis_id, match_data)
+                    # Extract first match ID while still in session
+                    first_match_id = match_objs[0].id if match_objs else None
             
             # Save pitch
             pitch = result.get("pitch", {})
-            if pitch and match_objs:
+            if pitch and first_match_id:
+                # Get the fit score from the top match in results
+                top_match_score = matches[0].get("score", 0) if matches else 0
+                
                 with get_db() as db:
                     pitch_data = [
                         {
                             "analysis_id": analysis_id,
-                            "product_match_id": match_objs[0].id,  # Top match
+                            "product_match_id": first_match_id,  # Top match
                             "persona": pitch.get("persona", "Executive"),
                             "subject": pitch.get("subject", ""),
                             "body": pitch.get("body", ""),
                             "key_quotes": pitch.get("key_quotes", []),
-                            "overall_score": match_objs[0].fit_score
+                            "overall_score": top_match_score
                         }
                     ]
                     PitchRepository.create_bulk(db, pitch_data)

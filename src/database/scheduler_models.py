@@ -39,6 +39,8 @@ class SchedulerConfig(Base):
     # Schedule settings
     cron_schedule = Column(String(100), nullable=False, default="0 2 * * *")  # Default: 2 AM daily
     is_active = Column(Boolean, default=False, nullable=False)
+    continuous_mode = Column(Boolean, default=False, nullable=False)  # Run continuously (one after another)
+    continuous_delay_minutes = Column(Integer, default=5)  # Delay between runs in continuous mode
     
     # Analysis strategy
     market_cap_priority = Column(JSON, default=["SMALL", "MID", "LARGE", "MEGA"])  # Priority order

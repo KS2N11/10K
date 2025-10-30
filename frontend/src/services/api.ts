@@ -169,6 +169,13 @@ class ApiClient {
     return response.data;
   }
 
+  async getAllJobs(includeCompleted: boolean = false): Promise<{ jobs: Array<{ job_id: string; status: string; }>; count: number }> {
+    const response = await this.client.get('/api/v2/analysis/jobs', {
+      params: { include_completed: includeCompleted, limit: 20 }
+    });
+    return response.data;
+  }
+
   // Companies
   async searchCompanies(params: {
     query?: string;

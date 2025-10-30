@@ -22,6 +22,8 @@ class SchedulerConfigUpdate(BaseModel):
     """Request model for updating scheduler config."""
     cron_schedule: Optional[str] = None
     is_active: Optional[bool] = None
+    continuous_mode: Optional[bool] = None
+    continuous_delay_minutes: Optional[int] = None
     market_cap_priority: Optional[List[str]] = None
     batch_size: Optional[int] = None
     analysis_interval_days: Optional[int] = None
@@ -160,6 +162,8 @@ async def update_scheduler_config(request: SchedulerConfigUpdate):
         await scheduler.update_config(
             cron_schedule=request.cron_schedule,
             is_active=request.is_active,
+            continuous_mode=request.continuous_mode,
+            continuous_delay_minutes=request.continuous_delay_minutes,
             market_cap_priority=request.market_cap_priority,
             batch_size=request.batch_size,
             analysis_interval_days=request.analysis_interval_days,

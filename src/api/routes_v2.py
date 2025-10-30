@@ -152,6 +152,65 @@ async def get_job_status(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/analysis/jobs")
+def get_all_jobs(
+    limit: int = Query(20, description="Number of jobs to return"),
+    include_completed: bool = Query(False, description="Include completed jobs"),
+    db: Session = Depends(get_db_session)
+):
+    """
+    Get all recent analysis jobs (active and optionally completed).
+    
+    Args:
+        limit: Maximum number of jobs to return
+        include_completed: Whether to include completed jobs
+        db: Database session
+    
+    Returns:
+        List of job IDs and their status
+    """
+    try:
+        from src.database.models import AnalysisJob, AnalysisStatus
+        from datetime import datetime, timedelta
+        
+        query = db.query(AnalysisJob).order_by(AnalysisJob.created_at.desc())
+        
+        if not include_completed:
+            # Only return active jobs (QUEUED or IN_PROGRESS)
+            query = query.filter(AnalysisJob.status.in_([
+                AnalysisStatus.QUEUED,
+                AnalysisStatus.IN_PROGRESS
+            ]))
+        else:
+            # Return jobs from last 24 hours
+            one_day_ago = datetime.utcnow() - timedelta(days=1)
+            query = query.filter(AnalysisJob.created_at >= one_day_ago)
+        
+        jobs = query.limit(limit).all()
+        
+        return {
+            "jobs": [
+                {
+                    "job_id": job.job_id,
+                    "status": job.status,
+                    "total_companies": job.total_companies,
+                    "completed": job.completed_count,
+                    "failed": job.failed_count,
+                    "skipped": job.skipped_count,
+                    "created_at": job.created_at.isoformat() if job.created_at else None,
+                    "started_at": job.started_at.isoformat() if job.started_at else None,
+                    "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+                }
+                for job in jobs
+            ],
+            "count": len(jobs)
+        }
+    
+    except Exception as e:
+        logger.error(f"Error getting jobs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/companies/search")
 def search_companies(
     request: CompanySearchRequest,

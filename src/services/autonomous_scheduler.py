@@ -16,8 +16,6 @@ from src.database.scheduler_models import (
 from src.database.repository import AnalysisJobRepository
 from src.services.scheduler_agent import SchedulerAgent
 from src.services.batch_analysis import BatchAnalysisService
-from src.utils.multi_llm import MultiProviderLLM
-from src.utils.multi_embeddings import MultiProviderEmbeddings
 from src.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -60,6 +58,7 @@ class AutonomousScheduler:
         self.batch_service = None
         self.is_running = False
         self._current_job_id = None
+        self._continuous_task = None  # Background task for continuous mode
     
     async def start(self):
         """Start the autonomous scheduler."""
@@ -96,6 +95,8 @@ class AutonomousScheduler:
             self.scheduler_config_data = {
                 "cron_schedule": scheduler_config.cron_schedule,
                 "is_active": scheduler_config.is_active,
+                "continuous_mode": getattr(scheduler_config, 'continuous_mode', False),
+                "continuous_delay_minutes": getattr(scheduler_config, 'continuous_delay_minutes', 5),
                 "market_cap_priority": scheduler_config.market_cap_priority,
                 "batch_size": scheduler_config.batch_size,
                 "analysis_interval_days": scheduler_config.analysis_interval_days,
@@ -105,14 +106,20 @@ class AutonomousScheduler:
                 "exclude_industries": scheduler_config.exclude_industries
             }
         
-        # Add cron job
+        # Choose mode: continuous or cron-based
         if self.scheduler_config_data["is_active"]:
-            self._add_cron_job()
-            logger.info(f"✅ Scheduler active with cron: {self.scheduler_config_data['cron_schedule']}")
+            if self.scheduler_config_data.get("continuous_mode", False):
+                # Continuous mode: run one after another with delay
+                logger.info(f"🔄 Starting in CONTINUOUS mode (delay: {self.scheduler_config_data['continuous_delay_minutes']}min between runs)")
+                self._continuous_task = asyncio.create_task(self._continuous_loop())
+            else:
+                # Cron mode: scheduled at specific times
+                self._add_cron_job()
+                logger.info(f"⏰ Starting in CRON mode: {self.scheduler_config_data['cron_schedule']}")
         else:
             logger.info("⏸️  Scheduler is paused (set is_active=True to enable)")
         
-        # Start APScheduler
+        # Start APScheduler (needed for cron mode)
         self.scheduler.start()
         self.is_running = True
         
@@ -125,6 +132,14 @@ class AutonomousScheduler:
             return
         
         logger.info("Stopping autonomous scheduler...")
+        
+        # Stop continuous loop if running
+        if self._continuous_task and not self._continuous_task.done():
+            self._continuous_task.cancel()
+            try:
+                await self._continuous_task
+            except asyncio.CancelledError:
+                logger.info("Continuous loop cancelled")
         
         self.scheduler.shutdown(wait=True)
         self.is_running = False
@@ -161,6 +176,8 @@ class AutonomousScheduler:
         self,
         cron_schedule: Optional[str] = None,
         is_active: Optional[bool] = None,
+        continuous_mode: Optional[bool] = None,
+        continuous_delay_minutes: Optional[int] = None,
         market_cap_priority: Optional[list] = None,
         batch_size: Optional[int] = None,
         analysis_interval_days: Optional[int] = None,
@@ -181,6 +198,10 @@ class AutonomousScheduler:
                 scheduler_config.cron_schedule = cron_schedule
             if is_active is not None:
                 scheduler_config.is_active = is_active
+            if continuous_mode is not None:
+                scheduler_config.continuous_mode = continuous_mode
+            if continuous_delay_minutes is not None:
+                scheduler_config.continuous_delay_minutes = continuous_delay_minutes
             if market_cap_priority is not None:
                 scheduler_config.market_cap_priority = market_cap_priority
             if batch_size is not None:
@@ -202,6 +223,8 @@ class AutonomousScheduler:
             self.scheduler_config_data = {
                 "cron_schedule": scheduler_config.cron_schedule,
                 "is_active": scheduler_config.is_active,
+                "continuous_mode": getattr(scheduler_config, 'continuous_mode', False),
+                "continuous_delay_minutes": getattr(scheduler_config, 'continuous_delay_minutes', 5),
                 "market_cap_priority": scheduler_config.market_cap_priority,
                 "batch_size": scheduler_config.batch_size,
                 "analysis_interval_days": scheduler_config.analysis_interval_days,
@@ -211,12 +234,27 @@ class AutonomousScheduler:
                 "exclude_industries": scheduler_config.exclude_industries
             }
         
-        # Re-schedule cron job (outside database session)
-        if is_active is not None or cron_schedule is not None:
+        # Re-schedule based on mode (outside database session)
+        mode_changed = continuous_mode is not None or is_active is not None or cron_schedule is not None
+        
+        if mode_changed:
+            # Stop current mode
             self._remove_cron_job()
+            if self._continuous_task and not self._continuous_task.done():
+                self._continuous_task.cancel()
+                try:
+                    await self._continuous_task
+                except asyncio.CancelledError:
+                    pass
+            
+            # Start new mode if active
             if self.scheduler_config_data["is_active"]:
-                self._add_cron_job()
-                logger.info(f"✅ Scheduler updated with new cron: {self.scheduler_config_data['cron_schedule']}")
+                if self.scheduler_config_data.get("continuous_mode", False):
+                    logger.info(f"🔄 Switched to CONTINUOUS mode (delay: {self.scheduler_config_data['continuous_delay_minutes']}min)")
+                    self._continuous_task = asyncio.create_task(self._continuous_loop())
+                else:
+                    self._add_cron_job()
+                    logger.info(f"⏰ Switched to CRON mode: {self.scheduler_config_data['cron_schedule']}")
             else:
                 logger.info("⏸️  Scheduler paused")
         
@@ -282,19 +320,68 @@ class AutonomousScheduler:
                 "recent_runs": recent_runs_data
             }
     
+    async def _continuous_loop(self):
+        """
+        Continuous mode: Run analysis jobs one after another with delay.
+        
+        This ensures:
+        - No overlapping jobs
+        - No wasted time waiting for cron schedule
+        - Continuous processing when there's work to do
+        """
+        try:
+            logger.info("🔄 Continuous loop started")
+            
+            while self.is_running:
+                try:
+                    # Check if already running a job
+                    if self._current_job_id:
+                        logger.debug("Job already running, waiting...")
+                        await asyncio.sleep(10)  # Check again in 10 seconds
+                        continue
+                    
+                    # Trigger a new run
+                    logger.info("🔄 Continuous mode: Starting new analysis run...")
+                    run_id = str(uuid.uuid4())
+                    await self._execute_scheduled_run(run_id, triggered_by="continuous")
+                    
+                    # Wait before next run
+                    delay_minutes = self.scheduler_config_data.get("continuous_delay_minutes", 5)
+                    logger.info(f"⏳ Continuous mode: Waiting {delay_minutes} minutes before next run...")
+                    await asyncio.sleep(delay_minutes * 60)
+                    
+                except asyncio.CancelledError:
+                    logger.info("Continuous loop cancelled")
+                    raise
+                except Exception as e:
+                    logger.error(f"Error in continuous loop: {e}")
+                    # Wait a bit before retrying on error
+                    await asyncio.sleep(60)
+        
+        except asyncio.CancelledError:
+            logger.info("Continuous loop stopped")
+        except Exception as e:
+            logger.error(f"Fatal error in continuous loop: {e}")
+            self.is_running = False
+
     async def _init_providers(self):
         """Initialize LLM and embedding providers."""
+        from src.utils.llm_factory import get_factory
+        
+        # Use centralized factory for LLM and embeddings
+        factory = get_factory()
+        
         if not self.llm_manager:
-            self.llm_manager = MultiProviderLLM(config=self.config)
+            self.llm_manager = factory.create_llm_manager()
         
         if not self.embedder:
-            self.embedder = MultiProviderEmbeddings(config=self.config)
+            self.embedder = factory.create_embedder()
         
         if not self.scheduler_agent:
-            self.scheduler_agent = SchedulerAgent(self.llm_manager, self.config)
+            self.scheduler_agent = SchedulerAgent(self.llm_manager, factory.get_config())
         
         if not self.batch_service:
-            self.batch_service = BatchAnalysisService(self.config)
+            self.batch_service = BatchAnalysisService(factory.get_config())
     
     def _add_cron_job(self):
         """Add cron job to scheduler."""

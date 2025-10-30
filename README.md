@@ -268,17 +268,50 @@ Full API documentation: http://localhost:8000/docs
 ]
 ```
 
-### Settings (`src/configs/settings.yaml`)
+### LLM Provider Configuration (Centralized)
+
+**The system uses a centralized LLM factory** (`src/utils/llm_factory.py`) to manage all LLM and embedding connections. Configure your provider via environment variables or `settings.yaml`.
+
+#### Provider Selection (.env)
+```bash
+# Select your primary LLM provider (no auto-detection)
+PRIMARY_LLM_PROVIDER=groq  # Options: groq, openai, azure
+
+# Select your primary embedding provider
+PRIMARY_EMBEDDING_PROVIDER=sentence-transformers  # Options: sentence-transformers, openai, cohere
+
+# API Keys (only provide keys for providers you want to use)
+GROQ_API_KEY=your-groq-key-here
+OPENAI_API_KEY=your-openai-key-here  # Optional
+COHERE_API_KEY=your-cohere-key-here  # Optional
+```
+
+**Important**: The system will use the provider you explicitly configure in `PRIMARY_LLM_PROVIDER`. There is no automatic provider switching based on which API keys are present.
+
+#### Advanced Configuration (settings.yaml)
 ```yaml
-# LLM Configuration
-llm_provider: "groq"              # or "openai"
-groq_api_key: "your-key-here"
-groq_model: "llama-3.3-70b-versatile"
-openai_api_key: "sk-..."          # if using OpenAI
+# LLM Configuration with fallback support
+llm:
+  primary_provider: "groq"
+  fallback_providers: ["openai"]  # Optional fallbacks if primary fails
+  groq:
+    model_name: "moonshotai/kimi-k2-instruct-0905"
+    temperature: 0.7
+    max_tokens: 4096
+  openai:
+    model_name: "gpt-4o-mini"
+    temperature: 0.7
+    max_tokens: 4096
 
 # Embedding Configuration
-embedding_provider: "groq"
-embedding_model: "llama-3.3-70b-versatile"
+embedding:
+  primary_provider: "sentence-transformers"
+  fallback_providers: []
+  sentence_transformers:
+    model_name: "all-mpnet-base-v2"
+    device: "cpu"
+  openai:
+    model_name: "text-embedding-3-large"
 
 # SEC Configuration
 sec_user_agent: "YourName your@email.com"  # REQUIRED by SEC
@@ -296,6 +329,19 @@ max_chunk_size: 1000
 chunk_overlap: 200
 top_k_chunks: 10
 ```
+
+#### Why Centralized Configuration?
+
+Previously, the system would auto-detect OpenAI API keys and switch providers automatically. This caused confusion:
+- ❌ Hard to predict which provider would be used
+- ❌ Configuration scattered across multiple files
+- ❌ Difficult to test with specific providers
+
+Now with the centralized factory:
+- ✅ Single source of truth for all LLM configuration
+- ✅ Explicit provider selection via configuration
+- ✅ Easy to switch providers without code changes
+- ✅ Consistent behavior across the application
 
 ---
 
@@ -431,6 +477,31 @@ npm run dev
 - Check logs for "Skipping" messages
 - Verify caching logic is enabled (no "Force re-analyze" checked)
 - Check `catalog_hash` consistency in database
+
+**ChromaDB Corruption Error** (PanicException, "range start index out of range"):
+```bash
+# Automatic recovery is built-in, but if issues persist:
+
+# Option 1: Let the system auto-recover (recommended)
+# The embedder will automatically detect and fix corruption
+
+# Option 2: Manual reset using CLI tool
+python reset_chromadb.py           # Reset all stores
+python reset_chromadb.py --vector  # Reset only vector store
+
+# Option 3: Manual reset using batch file
+scripts\reset_store.bat  # Windows
+scripts/reset_store.sh   # Linux/Mac
+
+# After reset, embeddings will be recreated automatically on next analysis
+```
+
+**Note**: ChromaDB corruption usually happens from:
+- Improper shutdown (closing terminal instead of Ctrl+C)
+- Multiple instances running simultaneously
+- Disk space issues during write operations
+
+The system now includes automatic recovery, so most corruption errors will be fixed without manual intervention.
 
 For more troubleshooting, see `QUICK_START.md`.
 

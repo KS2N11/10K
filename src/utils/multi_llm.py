@@ -96,43 +96,27 @@ class MultiProviderLLM:
     
     def _initialize_llms(self):
         """Initialize all configured LLM providers."""
-        # Auto-detect which provider to use based on available API keys
-        openai_key = self.config.get("openai_api_key") or os.getenv("OPENAI_API_KEY")
-        groq_key = self.config.get("groq_api_key") or os.getenv("GROQ_API_KEY")
-        azure_key = self.config.get("azure_api_key") or os.getenv("AZURE_OPENAI_API_KEY")
-        azure_endpoint = self.config.get("azure_endpoint") or os.getenv("AZURE_OPENAI_ENDPOINT")
-        
-        # Priority: Azure OpenAI > OpenAI > Groq
-        if azure_key and azure_endpoint and self.primary_provider == "groq":
-            logger.info("🔄 AZURE_OPENAI_API_KEY detected - switching to Azure OpenAI as primary provider")
-            self.primary_provider = "azure"
-            # Keep groq as fallback if available
-            if groq_key and "groq" not in self.fallback_providers:
-                self.fallback_providers = ["groq"] + self.fallback_providers
-            if openai_key and "openai" not in self.fallback_providers:
-                self.fallback_providers = ["openai"] + self.fallback_providers
-        elif openai_key and self.primary_provider == "groq":
-            logger.info("🔄 OPENAI_API_KEY detected - switching to OpenAI as primary provider")
-            self.primary_provider = "openai"
-            # Keep groq as fallback if available
-            if groq_key and "groq" not in self.fallback_providers:
-                self.fallback_providers = ["groq"] + self.fallback_providers
-        
+        # Initialize providers based on explicit configuration
+        # No auto-detection - use the primary_provider and fallback_providers as configured
         providers_to_init = [self.primary_provider] + self.fallback_providers
         
         for provider in providers_to_init:
             try:
                 if provider == "groq":
+                    groq_key = self.config.get("groq_api_key") or os.getenv("GROQ_API_KEY")
                     if not groq_key:
                         logger.warning(f"⚠️  Skipping {provider} - API key not found")
                         continue
                     self._llms[provider] = self._init_groq()
                 elif provider == "openai":
+                    openai_key = self.config.get("openai_api_key") or os.getenv("OPENAI_API_KEY")
                     if not openai_key:
                         logger.warning(f"⚠️  Skipping {provider} - API key not found")
                         continue
                     self._llms[provider] = self._init_openai()
                 elif provider == "azure":
+                    azure_key = self.config.get("azure_api_key") or os.getenv("AZURE_OPENAI_API_KEY")
+                    azure_endpoint = self.config.get("azure_endpoint") or os.getenv("AZURE_OPENAI_ENDPOINT")
                     if not azure_key or not azure_endpoint:
                         logger.warning(f"⚠️  Skipping {provider} - API key or endpoint not found")
                         continue
@@ -160,7 +144,7 @@ class MultiProviderLLM:
         
         return ChatGroq(
             api_key=api_key,
-            model=groq_config.get("model_name", "llama-3.3-70b-versatile"),
+            model=groq_config.get("model_name", "moonshotai/kimi-k2-instruct-0905"),
             temperature=groq_config.get("temperature", 0.7),
             max_tokens=groq_config.get("max_tokens", 4096),
         )
