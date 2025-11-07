@@ -9,9 +9,9 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Install system dependencies, netcat for db checks, and uv (fast Python package manager)
+# Install system dependencies and uv (fast Python package manager)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl netcat-traditional && \
+    apt-get install -y --no-install-recommends curl && \
     rm -rf /var/lib/apt/lists/* && \
     curl -LsSf https://astral.sh/uv/install.sh | sh
 
@@ -28,9 +28,6 @@ RUN uv pip install --system --no-cache .
 # Expose backend port
 EXPOSE 8000
 
-# Copy and set up startup script
-COPY startup.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/startup.sh
-
-# Use startup script as default command
-CMD ["/usr/local/bin/startup.sh"]
+# Default command that handles DB init and app startup
+CMD python init_db.py || echo "Note: Tables may already exist" && \
+    python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
