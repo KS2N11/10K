@@ -21,7 +21,9 @@ RUN uv pip install --system --no-cache .
 
 EXPOSE 8000
 
-COPY start.sh /app/start.sh
-RUN chmod +x /app/start.sh
+# Copy and prepare startup script
+COPY startup.sh /app/startup.sh
+# Ensure it's executable and convert CRLF to LF to avoid bash issues
+RUN chmod +x /app/startup.sh && sed -i 's/\r$//' /app/startup.sh
 
-CMD ["bash", "/app/start.sh"]
+CMD ["bash", "/app/startup.sh"]
