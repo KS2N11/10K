@@ -187,17 +187,16 @@ class MultiProviderLLM:
         api_version = (
             self.config.get("azure_api_version") or 
             os.getenv("AZURE_OPENAI_API_VERSION") or 
-            "2024-02-15-preview"
+            "2024-12-01-preview"
         )
-        
         return AzureChatOpenAI(
             azure_endpoint=endpoint,
             api_key=api_key,
             api_version=api_version,
             azure_deployment=deployment_name,
-            temperature=azure_config.get("temperature", 0.7),
-            max_tokens=azure_config.get("max_tokens", 4096),
+            temperature=azure_config.get("temperature", 0.7)
         )
+       
     
     async def ainvoke(
         self,
@@ -234,16 +233,22 @@ class MultiProviderLLM:
                 # Wait if needed for rate limits
                 await limiter.wait_if_needed()
                 
-                logger.info(f"🔄 Calling {prov} LLM")
+                # Log more details about the call
+                logger.info(f"🔄 Calling {prov} LLM (primary={self.primary_provider}, fallbacks={self.fallback_providers})")
+                if isinstance(messages[0], HumanMessage):
+                    logger.info(f"Query: {messages[0].content[:100]}...")
                 
                 # Call LLM
                 response = await llm.ainvoke(messages, **kwargs)
                 
-                logger.info(f"✅ Successfully got response from {prov}")
+                logger.info(f"✅ Successfully got response from {prov} (request complete)")
                 return response.content
                 
             except Exception as e:
+                import traceback
                 logger.warning(f"⚠️  {prov} LLM failed: {e}")
+                logger.warning(f"⚠️  {prov} LLM error details:\n{traceback.format_exc()}")
+                logger.warning(f"⚠️  Falling back from {prov} to next provider (if available)")
                 continue
         
         raise RuntimeError("All LLM providers failed")
