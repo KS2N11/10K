@@ -13,7 +13,7 @@ interface Analysis {
   top_match_score: number;
   pain_points_count: number;
   matches_count: number;
-  completed_at: string;
+  completed_at: string | null;
 }
 
 const COLORS = ['#667eea', '#764ba2', '#f093fb', '#4facfe'];
@@ -134,6 +134,7 @@ const Metrics: React.FC = () => {
   const scoreDistribution = prepareScoreDistribution();
   const scoreCategories = prepareScoreCategories();
   const topCompanies = getTopCompanies();
+  // @ts-ignore - prepared for future use
   const painVsMatches = preparePainVsMatches();
 
   if (loading) {
@@ -313,7 +314,7 @@ const Metrics: React.FC = () => {
                       fill="#8884d8"
                       dataKey="value"
                     >
-                      {scoreCategories.map((entry, index) => (
+                      {scoreCategories.map((_entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>

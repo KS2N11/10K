@@ -55,6 +55,7 @@ const TopPitches: React.FC = () => {
     }
   };
 
+  // @ts-ignore - reserved for future use
   const getScoreColor = (score: number) => {
     if (score >= 85) return 'bg-success-500';
     if (score >= 75) return 'bg-yellow-500';

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Upload, Trash2, AlertCircle, CheckCircle, FileText, Plus, X } from 'lucide-react';
+import { Package, Upload, Trash2, AlertCircle, CheckCircle, X } from 'lucide-react';
 import apiClient from '../services/api';
 import { LoadingSpinner, ErrorMessage } from '../components/common/Feedback';
 

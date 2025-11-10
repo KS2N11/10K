@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Rocket, Search, Filter, Play, CheckSquare, Square } from 'lucide-react';
+import { Rocket, Search, Play, CheckSquare, Square } from 'lucide-react';
 import apiClient, { type JobStatus } from '../services/api';
 import { LoadingSpinner, ErrorMessage, InfoMessage, SuccessMessage } from '../components/common/Feedback';
 
@@ -7,7 +7,7 @@ const AnalysisQueue: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'list' | 'filter' | 'jobs'>('list');
   const [companyNames, setCompanyNames] = useState('');
   const [marketCaps, setMarketCaps] = useState<string[]>([]);
-  const [industries, setIndustries] = useState<string[]>([]);
+  const [industries] = useState<string[]>([]);
   const [sectors, setSectors] = useState<string[]>([]);
   const [limit, setLimit] = useState(10);
   const [forceReanalyze, setForceReanalyze] = useState(false);
@@ -88,6 +88,7 @@ const AnalysisQueue: React.FC = () => {
     startBatchJob({ company_names: names, force_reanalyze: forceReanalyze });
   };
 
+  // @ts-ignore - reserved for future use
   const handleFilterSubmit = () => {
     if (marketCaps.length === 0 && industries.length === 0 && sectors.length === 0) {
       setError('Please select at least one filter');
