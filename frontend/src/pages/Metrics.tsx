@@ -71,6 +71,7 @@ const Metrics: React.FC = () => {
   const prepareTimeSeriesData = () => {
     const dailyCount: { [key: string]: number } = {};
     analyses.forEach(a => {
+      if (!a.completed_at) return; // Skip if no completion date
       const date = new Date(a.completed_at).toLocaleDateString();
       dailyCount[date] = (dailyCount[date] || 0) + 1;
     });
