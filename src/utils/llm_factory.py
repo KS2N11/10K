@@ -88,11 +88,15 @@ class LLMFactory:
             "vector_store_dir": "src/stores/vector",
             "catalog_store_dir": "src/stores/catalog",
             "embedding": {
-                "primary_provider": "sentence-transformers",
-                "fallback_providers": [],
+                "primary_provider": "azure",
+                "fallback_providers": ["sentence-transformers"],
                 "sentence_transformers": {
                     "model_name": "all-mpnet-base-v2",
                     "device": "cpu"
+                },
+                "azure": {
+                    "deployment": "text-embedding-3-large",
+                    "api_version": "2024-02-01"
                 },
                 "openai": {
                     "model_name": "text-embedding-3-large"
@@ -175,6 +179,17 @@ class LLMFactory:
         if os.getenv("PRIMARY_LLM_PROVIDER"):
             config["llm"]["primary_provider"] = os.getenv("PRIMARY_LLM_PROVIDER")
         
+        # Azure Embedding Configuration
+        if os.getenv("AZURE_EMBEDDING_DEPLOYMENT"):
+            if "azure" not in config["embedding"]:
+                config["embedding"]["azure"] = {}
+            config["embedding"]["azure"]["deployment"] = os.getenv("AZURE_EMBEDDING_DEPLOYMENT")
+        
+        if os.getenv("AZURE_EMBEDDING_API_VERSION"):
+            if "azure" not in config["embedding"]:
+                config["embedding"]["azure"] = {}
+            config["embedding"]["azure"]["api_version"] = os.getenv("AZURE_EMBEDDING_API_VERSION")
+        
         # Storage Paths
         if os.getenv("VECTOR_STORE_DIR"):
             config["vector_store_dir"] = os.getenv("VECTOR_STORE_DIR")
@@ -206,6 +221,10 @@ class LLMFactory:
         
         # Validate embedding provider
         emb_provider = config.get("embedding", {}).get("primary_provider")
+        
+        if emb_provider == "azure":
+            if not config.get("azure_api_key") or not config.get("azure_endpoint"):
+                logger.warning("⚠️  PRIMARY_EMBEDDING_PROVIDER set to 'azure' but Azure credentials not found")
         
         if emb_provider == "openai" and not config.get("openai_api_key"):
             logger.warning("⚠️  PRIMARY_EMBEDDING_PROVIDER set to 'openai' but OPENAI_API_KEY not found")
@@ -247,8 +266,8 @@ class LLMFactory:
         logger.info(f"📊 Creating embeddings manager with primary provider: {emb_config.get('primary_provider')}")
         
         return MultiProviderEmbeddings(
-            primary_provider=emb_config.get("primary_provider", "sentence-transformers"),
-            fallback_providers=emb_config.get("fallback_providers", []),
+            primary_provider=emb_config.get("primary_provider", "azure"),
+            fallback_providers=emb_config.get("fallback_providers", ["sentence-transformers"]),
             config=emb_config,
         )
     

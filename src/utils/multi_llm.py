@@ -68,28 +68,41 @@ class RateLimiter:
 
 class MultiProviderLLM:
     """LLM manager with multiple providers and fallback support."""
-    
+
     def __init__(
         self,
-        primary_provider: ProviderType = "groq",
+        primary_provider: Optional[ProviderType] = None,
         fallback_providers: Optional[List[ProviderType]] = None,
         config: Optional[Dict[str, Any]] = None,
         rate_limits: Optional[Dict[str, Dict[str, int]]] = None,
     ):
         """
         Initialize multi-provider LLM.
-        
+
         Args:
-            primary_provider: Primary LLM provider to use
-            fallback_providers: List of fallback providers if primary fails
-            config: Configuration dict for each provider
-            rate_limits: Rate limit config for each provider
+            primary_provider: Primary LLM provider to use. If None, derives from config.
+            fallback_providers: List of fallback providers if primary fails. If None, derives from config.
+            config: Full application config or LLM-only config section.
+            rate_limits: Rate limit config for each provider.
         """
-        self.primary_provider = primary_provider
-        self.fallback_providers = fallback_providers or []
-        self.config = config or {}
+        # Accept either full app config (with an "llm" section) or the llm section directly
+        self.app_config: Dict[str, Any] = config or {}
+        self.llm_config: Dict[str, Any] = self.app_config.get("llm", self.app_config)
+
+        # Resolve provider selection from explicit args first, then config, then default
+        self.primary_provider: ProviderType = (
+            primary_provider if primary_provider is not None else self.llm_config.get("primary_provider", "groq")
+        )  # type: ignore[assignment]
+        self.fallback_providers: List[ProviderType] = (
+            fallback_providers if fallback_providers is not None else self.llm_config.get("fallback_providers", [])
+        )  # type: ignore[assignment]
+
+        # Backward-compat alias used by helper initializers for model params
+        # Keep this pointing at the LLM section
+        self.config: Dict[str, Any] = self.llm_config
+
         self.rate_limits = rate_limits or {}
-        
+
         self._llms: Dict[str, BaseChatModel] = {}
         self._limiters: Dict[str, RateLimiter] = {}
         self._initialize_llms()
@@ -103,20 +116,36 @@ class MultiProviderLLM:
         for provider in providers_to_init:
             try:
                 if provider == "groq":
-                    groq_key = self.config.get("groq_api_key") or os.getenv("GROQ_API_KEY")
+                    groq_key = (
+                        self.app_config.get("groq_api_key")
+                        or self.config.get("groq_api_key")
+                        or os.getenv("GROQ_API_KEY")
+                    )
                     if not groq_key:
                         logger.warning(f"⚠️  Skipping {provider} - API key not found")
                         continue
                     self._llms[provider] = self._init_groq()
                 elif provider == "openai":
-                    openai_key = self.config.get("openai_api_key") or os.getenv("OPENAI_API_KEY")
+                    openai_key = (
+                        self.app_config.get("openai_api_key")
+                        or self.config.get("openai_api_key")
+                        or os.getenv("OPENAI_API_KEY")
+                    )
                     if not openai_key:
                         logger.warning(f"⚠️  Skipping {provider} - API key not found")
                         continue
                     self._llms[provider] = self._init_openai()
                 elif provider == "azure":
-                    azure_key = self.config.get("azure_api_key") or os.getenv("AZURE_OPENAI_API_KEY")
-                    azure_endpoint = self.config.get("azure_endpoint") or os.getenv("AZURE_OPENAI_ENDPOINT")
+                    azure_key = (
+                        self.app_config.get("azure_api_key")
+                        or self.config.get("azure_api_key")
+                        or os.getenv("AZURE_OPENAI_API_KEY")
+                    )
+                    azure_endpoint = (
+                        self.app_config.get("azure_endpoint")
+                        or self.config.get("azure_endpoint")
+                        or os.getenv("AZURE_OPENAI_ENDPOINT")
+                    )
                     if not azure_key or not azure_endpoint:
                         logger.warning(f"⚠️  Skipping {provider} - API key or endpoint not found")
                         continue
@@ -135,10 +164,14 @@ class MultiProviderLLM:
     
     def _init_groq(self) -> ChatGroq:
         """Initialize Groq LLM."""
-        groq_config = self.config.get("groq", {})
+        groq_config = self.llm_config.get("groq", {})
         
         # Check if API key is available (from config or environment)
-        api_key = self.config.get("groq_api_key") or os.getenv("GROQ_API_KEY")
+        api_key = (
+            self.app_config.get("groq_api_key")
+            or self.config.get("groq_api_key")
+            or os.getenv("GROQ_API_KEY")
+        )
         if not api_key:
             raise ValueError("GROQ_API_KEY not found in config or environment")
         
@@ -151,10 +184,14 @@ class MultiProviderLLM:
     
     def _init_openai(self) -> ChatOpenAI:
         """Initialize OpenAI LLM."""
-        openai_config = self.config.get("openai", {})
+        openai_config = self.llm_config.get("openai", {})
         
         # Check if API key is available (from config or environment)
-        api_key = self.config.get("openai_api_key") or os.getenv("OPENAI_API_KEY")
+        api_key = (
+            self.app_config.get("openai_api_key")
+            or self.config.get("openai_api_key")
+            or os.getenv("OPENAI_API_KEY")
+        )
         if not api_key:
             raise ValueError("OPENAI_API_KEY not found in config or environment")
         
@@ -167,27 +204,37 @@ class MultiProviderLLM:
     
     def _init_azure(self) -> AzureChatOpenAI:
         """Initialize Azure OpenAI LLM."""
-        azure_config = self.config.get("azure", {})
+        azure_config = self.llm_config.get("azure", {})
         
         # Check if API key and endpoint are available
-        api_key = self.config.get("azure_api_key") or os.getenv("AZURE_OPENAI_API_KEY")
-        endpoint = self.config.get("azure_endpoint") or os.getenv("AZURE_OPENAI_ENDPOINT")
+        api_key = (
+            self.app_config.get("azure_api_key")
+            or self.config.get("azure_api_key")
+            or os.getenv("AZURE_OPENAI_API_KEY")
+        )
+        endpoint = (
+            self.app_config.get("azure_endpoint")
+            or self.config.get("azure_endpoint")
+            or os.getenv("AZURE_OPENAI_ENDPOINT")
+        )
         
         if not api_key or not endpoint:
             raise ValueError("AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT required")
         
         # Azure deployment name (defaults to model name)
         deployment_name = (
-            self.config.get("azure_deployment") or 
-            os.getenv("AZURE_OPENAI_DEPLOYMENT") or 
-            azure_config.get("model_name", "gpt-4o-mini")
+            self.app_config.get("azure_deployment")
+            or self.config.get("azure_deployment")
+            or os.getenv("AZURE_OPENAI_DEPLOYMENT")
+            or azure_config.get("model_name", "gpt-4o-mini")
         )
         
         # API version
         api_version = (
-            self.config.get("azure_api_version") or 
-            os.getenv("AZURE_OPENAI_API_VERSION") or 
-            "2024-12-01-preview"
+            self.app_config.get("azure_api_version")
+            or self.config.get("azure_api_version")
+            or os.getenv("AZURE_OPENAI_API_VERSION")
+            or "2024-12-01-preview"
         )
         return AzureChatOpenAI(
             azure_endpoint=endpoint,
@@ -311,7 +358,7 @@ def create_llm_manager(settings: Dict[str, Any]) -> MultiProviderLLM:
     return MultiProviderLLM(
         primary_provider=llm_config.get("primary_provider", "groq"),
         fallback_providers=llm_config.get("fallback_providers", []),
-        config=llm_config,
+        config=settings,
         rate_limits=settings.get("rate_limits", {}),
     )
 

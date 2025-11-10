@@ -1,0 +1,450 @@
+{
+  "company_name": "Amazon",
+  "filing_metadata": {
+    "cik": "0001018724",
+    "company": "AMAZON COM INC",
+    "form_type": "10-Q",
+    "file_date": "2025-10-31",
+    "reporting_date": "2025-09-30",
+    "acc_no": "000101872425000123",
+    "acc_no_raw": "0001018724-25-000123",
+    "document_url": "https://www.sec.gov/cgi-bin/viewer?action=view&cik=0001018724&accession_number=0001018724-25-000123&xbrl_type=v"
+  },
+  "pain_points": [
+    {
+      "category": "operational_challenges",
+      "description": "The company has significant obligations related to finance and operating leases, which may impact operational flexibility and financial health.",
+      "severity": "medium",
+      "evidence": "us-gaap:FinanceLeaseRightOfUseAssetStatementOfFinancialPositionExtensibleList and us-gaap:OperatingLeaseLiabilityCurrentStatementOfFinancialPositionExtensibleList indicate substantial lease liabilities.",
+      "quarter": "2025-09-30"
+    },
+    {
+      "category": "cost_management_issues",
+      "description": "Accumulated depreciation and amortization associated with finance leases could indicate increasing operational costs.",
+      "severity": "medium",
+      "evidence": "us-gaap:PropertyPlantAndEquipmentAndFinanceLeaseRightOfUseAssetAfterAccumulatedDepreciationAndAmortization suggests growing depreciation and amortization expenses.",
+      "quarter": "2025-09-30"
+    },
+    {
+      "category": "regulatory_or_compliance_concerns",
+      "description": "The filing uses complex financial reporting structures that may increase compliance risks or costs related to maintaining adherence to reporting regulations.",
+      "severity": "low",
+      "evidence": "Complex XBRL taxonomy references such as http://fasb.org/us-gaap/2025 and http://xbrl.sec.gov/country/2025.",
+      "quarter": "2025-09-30"
+    }
+  ],
+  "matched_solutions": [
+    {
+      "pain_point": {
+        "category": "operational_challenges",
+        "description": "The company has significant obligations related to finance and operating leases, which may impact operational flexibility and financial health.",
+        "severity": "medium",
+        "evidence": "us-gaap:FinanceLeaseRightOfUseAssetStatementOfFinancialPositionExtensibleList and us-gaap:OperatingLeaseLiabilityCurrentStatementOfFinancialPositionExtensibleList indicate substantial lease liabilities.",
+        "quarter": "2025-09-30"
+      },
+      "solution": {
+        "id": "cloud-migration-001",
+        "name": "Cloud Migration & Optimization",
+        "category": "Infrastructure & Cloud",
+        "description": "End-to-end cloud migration services including assessment, migration strategy, implementation, and optimization for AWS, Azure, and GCP platforms.",
+        "pain_points_addressed": [
+          "operational_costs",
+          "infrastructure_scalability",
+          "legacy_systems",
+          "operational_efficiency"
+        ],
+        "value_proposition": "Reduce infrastructure costs by 30-40% while improving scalability and performance"
+      },
+      "relevance_score": 0.5,
+      "matching_rationale": "Cloud Migration & Optimization addresses operational_challenges challenges"
+    },
+    {
+      "pain_point": {
+        "category": "operational_challenges",
+        "description": "The company has significant obligations related to finance and operating leases, which may impact operational flexibility and financial health.",
+        "severity": "medium",
+        "evidence": "us-gaap:FinanceLeaseRightOfUseAssetStatementOfFinancialPositionExtensibleList and us-gaap:OperatingLeaseLiabilityCurrentStatementOfFinancialPositionExtensibleList indicate substantial lease liabilities.",
+        "quarter": "2025-09-30"
+      },
+      "solution": {
+        "id": "automation-rpa-001",
+        "name": "Intelligent Process Automation",
+        "category": "Automation & RPA",
+        "description": "RPA and intelligent automation solutions to streamline repetitive tasks, reduce errors, and improve operational efficiency.",
+        "pain_points_addressed": [
+          "operational_efficiency",
+          "labor_costs",
+          "error_reduction",
+          "process_optimization"
+        ],
+        "value_proposition": "Automate up to 70% of repetitive tasks, reducing operational costs by 25-35%"
+      },
+      "relevance_score": 0.5,
+      "matching_rationale": "Intelligent Process Automation addresses operational_challenges challenges"
+    },
+    {
+      "pain_point": {
+        "category": "operational_challenges",
+        "description": "The company has significant obligations related to finance and operating leases, which may impact operational flexibility and financial health.",
+        "severity": "medium",
+        "evidence": "us-gaap:FinanceLeaseRightOfUseAssetStatementOfFinancialPositionExtensibleList and us-gaap:OperatingLeaseLiabilityCurrentStatementOfFinancialPositionExtensibleList indicate substantial lease liabilities.",
+        "quarter": "2025-09-30"
+      },
+      "solution": {
+        "id": "cybersecurity-001",
+        "name": "Enterprise Cybersecurity Suite",
+        "category": "Security & Compliance",
+        "description": "Comprehensive cybersecurity solution including threat detection, incident response, compliance management, and employee training.",
+        "pain_points_addressed": [
+          "security_risks",
+          "compliance_challenges",
+          "data_breach_prevention",
+          "regulatory_requirements"
+        ],
+        "value_proposition": "Reduce security incidents by 80% and ensure compliance with SOC 2, GDPR, HIPAA"
+      },
+      "relevance_score": 0.5,
+      "matching_rationale": "Enterprise Cybersecurity Suite addresses operational_challenges challenges"
+    },
+    {
+      "pain_point": {
+        "category": "operational_challenges",
+        "description": "The company has significant obligations related to finance and operating leases, which may impact operational flexibility and financial health.",
+        "severity": "medium",
+        "evidence": "us-gaap:FinanceLeaseRightOfUseAssetStatementOfFinancialPositionExtensibleList and us-gaap:OperatingLeaseLiabilityCurrentStatementOfFinancialPositionExtensibleList indicate substantial lease liabilities.",
+        "quarter": "2025-09-30"
+      },
+      "solution": {
+        "id": "digital-transformation-001",
+        "name": "Digital Transformation Consulting",
+        "category": "Consulting & Strategy",
+        "description": "Strategic consulting to modernize business processes, implement digital technologies, and drive organizational change.",
+        "pain_points_addressed": [
+          "legacy_systems",
+          "market_competition",
+          "customer_experience",
+          "operational_efficiency"
+        ],
+        "value_proposition": "Accelerate digital transformation journey with proven frameworks and reduce time-to-market by 40%"
+      },
+      "relevance_score": 0.5,
+      "matching_rationale": "Digital Transformation Consulting addresses operational_challenges challenges"
+    },
+    {
+      "pain_point": {
+        "category": "operational_challenges",
+        "description": "The company has significant obligations related to finance and operating leases, which may impact operational flexibility and financial health.",
+        "severity": "medium",
+        "evidence": "us-gaap:FinanceLeaseRightOfUseAssetStatementOfFinancialPositionExtensibleList and us-gaap:OperatingLeaseLiabilityCurrentStatementOfFinancialPositionExtensibleList indicate substantial lease liabilities.",
+        "quarter": "2025-09-30"
+      },
+      "solution": {
+        "id": "ai-ml-platform-001",
+        "name": "AI/ML Platform Development",
+        "category": "AI & Machine Learning",
+        "description": "Custom AI/ML solutions for predictive analytics, natural language processing, computer vision, and recommendation systems.",
+        "pain_points_addressed": [
+          "predictive_analytics",
+          "customer_personalization",
+          "operational_forecasting",
+          "revenue_optimization"
+        ],
+        "value_proposition": "Leverage AI to improve forecasting accuracy by 50% and personalize customer experiences"
+      },
+      "relevance_score": 0.5,
+      "matching_rationale": "AI/ML Platform Development addresses operational_challenges challenges"
+    },
+    {
+      "pain_point": {
+        "category": "operational_challenges",
+        "description": "The company has significant obligations related to finance and operating leases, which may impact operational flexibility and financial health.",
+        "severity": "medium",
+        "evidence": "us-gaap:FinanceLeaseRightOfUseAssetStatementOfFinancialPositionExtensibleList and us-gaap:OperatingLeaseLiabilityCurrentStatementOfFinancialPositionExtensibleList indicate substantial lease liabilities.",
+        "quarter": "2025-09-30"
+      },
+      "solution": {
+        "id": "talent-mgmt-001",
+        "name": "Talent Management & HR Tech",
+        "category": "Human Resources",
+        "description": "Comprehensive HR technology platform for recruitment, onboarding, performance management, and employee engagement.",
+        "pain_points_addressed": [
+          "talent_retention",
+          "hiring_challenges",
+          "employee_productivity",
+          "workforce_planning"
+        ],
+        "value_proposition": "Reduce time-to-hire by 40% and improve employee retention by 30%"
+      },
+      "relevance_score": 0.5,
+      "matching_rationale": "Talent Management & HR Tech addresses operational_challenges challenges"
+    },
+    {
+      "pain_point": {
+        "category": "cost_management_issues",
+        "description": "Accumulated depreciation and amortization associated with finance leases could indicate increasing operational costs.",
+        "severity": "medium",
+        "evidence": "us-gaap:PropertyPlantAndEquipmentAndFinanceLeaseRightOfUseAssetAfterAccumulatedDepreciationAndAmortization suggests growing depreciation and amortization expenses.",
+        "quarter": "2025-09-30"
+      },
+      "solution": {
+        "id": "cloud-migration-001",
+        "name": "Cloud Migration & Optimization",
+        "category": "Infrastructure & Cloud",
+        "description": "End-to-end cloud migration services including assessment, migration strategy, implementation, and optimization for AWS, Azure, and GCP platforms.",
+        "pain_points_addressed": [
+          "operational_costs",
+          "infrastructure_scalability",
+          "legacy_systems",
+          "operational_efficiency"
+        ],
+        "value_proposition": "Reduce infrastructure costs by 30-40% while improving scalability and performance"
+      },
+      "relevance_score": 0.5,
+      "matching_rationale": "Cloud Migration & Optimization addresses cost_management_issues challenges"
+    },
+    {
+      "pain_point": {
+        "category": "cost_management_issues",
+        "description": "Accumulated depreciation and amortization associated with finance leases could indicate increasing operational costs.",
+        "severity": "medium",
+        "evidence": "us-gaap:PropertyPlantAndEquipmentAndFinanceLeaseRightOfUseAssetAfterAccumulatedDepreciationAndAmortization suggests growing depreciation and amortization expenses.",
+        "quarter": "2025-09-30"
+      },
+      "solution": {
+        "id": "automation-rpa-001",
+        "name": "Intelligent Process Automation",
+        "category": "Automation & RPA",
+        "description": "RPA and intelligent automation solutions to streamline repetitive tasks, reduce errors, and improve operational efficiency.",
+        "pain_points_addressed": [
+          "operational_efficiency",
+          "labor_costs",
+          "error_reduction",
+          "process_optimization"
+        ],
+        "value_proposition": "Automate up to 70% of repetitive tasks, reducing operational costs by 25-35%"
+      },
+      "relevance_score": 0.5,
+      "matching_rationale": "Intelligent Process Automation addresses cost_management_issues challenges"
+    },
+    {
+      "pain_point": {
+        "category": "cost_management_issues",
+        "description": "Accumulated depreciation and amortization associated with finance leases could indicate increasing operational costs.",
+        "severity": "medium",
+        "evidence": "us-gaap:PropertyPlantAndEquipmentAndFinanceLeaseRightOfUseAssetAfterAccumulatedDepreciationAndAmortization suggests growing depreciation and amortization expenses.",
+        "quarter": "2025-09-30"
+      },
+      "solution": {
+        "id": "supply-chain-opt-001",
+        "name": "Supply Chain Optimization",
+        "category": "Supply Chain & Logistics",
+        "description": "End-to-end supply chain optimization using AI, IoT, and advanced analytics to improve visibility and reduce costs.",
+        "pain_points_addressed": [
+          "supply_chain_disruption",
+          "inventory_management",
+          "logistics_costs",
+          "vendor_management"
+        ],
+        "value_proposition": "Reduce supply chain costs by 20-25% and improve delivery times by 30%"
+      },
+      "relevance_score": 0.5,
+      "matching_rationale": "Supply Chain Optimization addresses cost_management_issues challenges"
+    },
+    {
+      "pain_point": {
+        "category": "cost_management_issues",
+        "description": "Accumulated depreciation and amortization associated with finance leases could indicate increasing operational costs.",
+        "severity": "medium",
+        "evidence": "us-gaap:PropertyPlantAndEquipmentAndFinanceLeaseRightOfUseAssetAfterAccumulatedDepreciationAndAmortization suggests growing depreciation and amortization expenses.",
+        "quarter": "2025-09-30"
+      },
+      "solution": {
+        "id": "financial-mgmt-001",
+        "name": "Financial Management System",
+        "category": "Finance & Accounting",
+        "description": "Integrated financial management platform for planning, budgeting, forecasting, and real-time financial reporting.",
+        "pain_points_addressed": [
+          "financial_planning",
+          "cost_control",
+          "revenue_visibility",
+          "budget_management"
+        ],
+        "value_proposition": "Improve financial planning accuracy by 35% and reduce closing cycles by 50%"
+      },
+      "relevance_score": 0.5,
+      "matching_rationale": "Financial Management System addresses cost_management_issues challenges"
+    },
+    {
+      "pain_point": {
+        "category": "regulatory_or_compliance_concerns",
+        "description": "The filing uses complex financial reporting structures that may increase compliance risks or costs related to maintaining adherence to reporting regulations.",
+        "severity": "low",
+        "evidence": "Complex XBRL taxonomy references such as http://fasb.org/us-gaap/2025 and http://xbrl.sec.gov/country/2025.",
+        "quarter": "2025-09-30"
+      },
+      "solution": {
+        "id": "automation-rpa-001",
+        "name": "Intelligent Process Automation",
+        "category": "Automation & RPA",
+        "description": "RPA and intelligent automation solutions to streamline repetitive tasks, reduce errors, and improve operational efficiency.",
+        "pain_points_addressed": [
+          "operational_efficiency",
+          "labor_costs",
+          "error_reduction",
+          "process_optimization"
+        ],
+        "value_proposition": "Automate up to 70% of repetitive tasks, reducing operational costs by 25-35%"
+      },
+      "relevance_score": 0.5,
+      "matching_rationale": "Intelligent Process Automation addresses regulatory_or_compliance_concerns challenges"
+    },
+    {
+      "pain_point": {
+        "category": "regulatory_or_compliance_concerns",
+        "description": "The filing uses complex financial reporting structures that may increase compliance risks or costs related to maintaining adherence to reporting regulations.",
+        "severity": "low",
+        "evidence": "Complex XBRL taxonomy references such as http://fasb.org/us-gaap/2025 and http://xbrl.sec.gov/country/2025.",
+        "quarter": "2025-09-30"
+      },
+      "solution": {
+        "id": "cybersecurity-001",
+        "name": "Enterprise Cybersecurity Suite",
+        "category": "Security & Compliance",
+        "description": "Comprehensive cybersecurity solution including threat detection, incident response, compliance management, and employee training.",
+        "pain_points_addressed": [
+          "security_risks",
+          "compliance_challenges",
+          "data_breach_prevention",
+          "regulatory_requirements"
+        ],
+        "value_proposition": "Reduce security incidents by 80% and ensure compliance with SOC 2, GDPR, HIPAA"
+      },
+      "relevance_score": 0.5,
+      "matching_rationale": "Enterprise Cybersecurity Suite addresses regulatory_or_compliance_concerns challenges"
+    },
+    {
+      "pain_point": {
+        "category": "regulatory_or_compliance_concerns",
+        "description": "The filing uses complex financial reporting structures that may increase compliance risks or costs related to maintaining adherence to reporting regulations.",
+        "severity": "low",
+        "evidence": "Complex XBRL taxonomy references such as http://fasb.org/us-gaap/2025 and http://xbrl.sec.gov/country/2025.",
+        "quarter": "2025-09-30"
+      },
+      "solution": {
+        "id": "ai-ml-platform-001",
+        "name": "AI/ML Platform Development",
+        "category": "AI & Machine Learning",
+        "description": "Custom AI/ML solutions for predictive analytics, natural language processing, computer vision, and recommendation systems.",
+        "pain_points_addressed": [
+          "predictive_analytics",
+          "customer_personalization",
+          "operational_forecasting",
+          "revenue_optimization"
+        ],
+        "value_proposition": "Leverage AI to improve forecasting accuracy by 50% and personalize customer experiences"
+      },
+      "relevance_score": 0.5,
+      "matching_rationale": "AI/ML Platform Development addresses regulatory_or_compliance_concerns challenges"
+    },
+    {
+      "pain_point": {
+        "category": "regulatory_or_compliance_concerns",
+        "description": "The filing uses complex financial reporting structures that may increase compliance risks or costs related to maintaining adherence to reporting regulations.",
+        "severity": "low",
+        "evidence": "Complex XBRL taxonomy references such as http://fasb.org/us-gaap/2025 and http://xbrl.sec.gov/country/2025.",
+        "quarter": "2025-09-30"
+      },
+      "solution": {
+        "id": "supply-chain-opt-001",
+        "name": "Supply Chain Optimization",
+        "category": "Supply Chain & Logistics",
+        "description": "End-to-end supply chain optimization using AI, IoT, and advanced analytics to improve visibility and reduce costs.",
+        "pain_points_addressed": [
+          "supply_chain_disruption",
+          "inventory_management",
+          "logistics_costs",
+          "vendor_management"
+        ],
+        "value_proposition": "Reduce supply chain costs by 20-25% and improve delivery times by 30%"
+      },
+      "relevance_score": 0.5,
+      "matching_rationale": "Supply Chain Optimization addresses regulatory_or_compliance_concerns challenges"
+    },
+    {
+      "pain_point": {
+        "category": "regulatory_or_compliance_concerns",
+        "description": "The filing uses complex financial reporting structures that may increase compliance risks or costs related to maintaining adherence to reporting regulations.",
+        "severity": "low",
+        "evidence": "Complex XBRL taxonomy references such as http://fasb.org/us-gaap/2025 and http://xbrl.sec.gov/country/2025.",
+        "quarter": "2025-09-30"
+      },
+      "solution": {
+        "id": "talent-mgmt-001",
+        "name": "Talent Management & HR Tech",
+        "category": "Human Resources",
+        "description": "Comprehensive HR technology platform for recruitment, onboarding, performance management, and employee engagement.",
+        "pain_points_addressed": [
+          "talent_retention",
+          "hiring_challenges",
+          "employee_productivity",
+          "workforce_planning"
+        ],
+        "value_proposition": "Reduce time-to-hire by 40% and improve employee retention by 30%"
+      },
+      "relevance_score": 0.5,
+      "matching_rationale": "Talent Management & HR Tech addresses regulatory_or_compliance_concerns challenges"
+    }
+  ],
+  "insights": [
+    {
+      "company_name": "Amazon",
+      "quarter": "2025-09-30",
+      "pain_point_summary": "The company has significant obligations related to finance and operating leases, which may impact operational flexibility and financial health.",
+      "recommended_solution": "Cloud Migration & Optimization",
+      "value_proposition": "Reduce infrastructure costs by 30-40% while improving scalability and performance",
+      "engagement_strategy": "1. **Pain Point Summary:** Amazon's high financial and operating lease obligations limit operational flexibility and strain financial health.  \n2. **Recommended Solution:** Implement a robust cloud migration and optimization strategy to reduce reliance on physical infrastructure and associated lease costs.  \n3. **Value Proposition:** By optimizing cloud infrastructure, Amazon can decrease infrastructure costs by 30-40% while enhancing scalability and operational efficiency.  \n4. **Engagement Strategy:** Initiate a conversation with Amazon's finance and IT leadership, emphasizing how cloud optimization directly alleviates financial lease burdens and improves cost predictability. Present tailored case studies showcasing similar enterprise cost reductions and propose a pilot project targeting a specific high-cost infrastructure segment to demonstrate immediate impact.  \n5. **Priority:** High",
+      "priority": "medium",
+      "relevance_score": 0.5
+    },
+    {
+      "company_name": "Amazon",
+      "quarter": "2025-09-30",
+      "pain_point_summary": "The company has significant obligations related to finance and operating leases, which may impact operational flexibility and financial health.",
+      "recommended_solution": "Intelligent Process Automation",
+      "value_proposition": "Automate up to 70% of repetitive tasks, reducing operational costs by 25-35%",
+      "engagement_strategy": "1. **Pain Point Summary:** Amazon's high obligations tied to finance and operating leases are straining operational flexibility and could hamper financial health.  \n2. **Recommended Solution:** Implement Intelligent Process Automation to streamline lease management and operations.  \n3. **Value Proposition:** Automating up to 70% of repetitive tasks can reduce operational costs by 25-35%, freeing up resources to address financial obligations more effectively.  \n4. **Engagement Strategy:** Initiate a targeted discussion with Amazon\u2019s finance and operations leadership highlighting case studies where automation has directly reduced lease management costs. Propose a pilot program focused on automating processes like lease payment tracking and compliance reporting, with clear KPIs tied to cost savings.  \n5. **Priority:** High  ",
+      "priority": "medium",
+      "relevance_score": 0.5
+    },
+    {
+      "company_name": "Amazon",
+      "quarter": "2025-09-30",
+      "pain_point_summary": "The company has significant obligations related to finance and operating leases, which may impact operational flexibility and financial health.",
+      "recommended_solution": "Enterprise Cybersecurity Suite",
+      "value_proposition": "Reduce security incidents by 80% and ensure compliance with SOC 2, GDPR, HIPAA",
+      "engagement_strategy": "1. **Pain Point Summary:** Amazon\u2019s significant financial and operating lease obligations could strain resources, making it critical to avoid unexpected costs from security breaches or regulatory fines.  \n2. **Recommended Solution:** Implementing the Enterprise Cybersecurity Suite can proactively mitigate security risks and maintain compliance with key regulations.  \n3. **Value Proposition:** The solution reduces security incidents by 80% and ensures compliance with SOC 2, GDPR, and HIPAA, safeguarding financial stability and operational continuity.  \n4. **Engagement Strategy:** Approach Amazon\u2019s finance and IT leaders with a tailored risk assessment that quantifies potential savings from avoided security breaches and compliance penalties. Highlight case studies of similar enterprise clients who achieved significant cost avoidance and include a pilot program to demonstrate ROI within 90 days.  \n5. **Priority:** **Medium** (Position the offering as a proactive measure to protect financial health and avoid compounding obligations amidst existing commitments).  ",
+      "priority": "medium",
+      "relevance_score": 0.5
+    },
+    {
+      "company_name": "Amazon",
+      "quarter": "2025-09-30",
+      "pain_point_summary": "The company has significant obligations related to finance and operating leases, which may impact operational flexibility and financial health.",
+      "recommended_solution": "Digital Transformation Consulting",
+      "value_proposition": "Accelerate digital transformation journey with proven frameworks and reduce time-to-market by 40%",
+      "engagement_strategy": "1. **Pain Point Summary**: Amazon's extensive finance and operating lease obligations are straining operational flexibility and could challenge sustained financial health.  \n2. **Recommended Solution**: Implement a tailored digital transformation strategy to streamline operations and optimize cost structures.  \n3. **Value Proposition**: Our proven digital transformation frameworks enable Amazon to reduce time-to-market by 40% while driving efficiency and cost savings across its lease-heavy operations.  \n4. **Engagement Strategy**: Initiate discussions with Amazon's finance and operations leadership to highlight how digital transformation can optimize lease management and operational processes. Present case studies from large enterprises with similar obligations, emphasizing measurable ROI and time savings. Offer a pilot program focused on one lease-heavy business unit to demonstrate quick wins.  \n5. **Priority**: Medium.  ",
+      "priority": "medium",
+      "relevance_score": 0.5
+    },
+    {
+      "company_name": "Amazon",
+      "quarter": "2025-09-30",
+      "pain_point_summary": "The company has significant obligations related to finance and operating leases, which may impact operational flexibility and financial health.",
+      "recommended_solution": "AI/ML Platform Development",
+      "value_proposition": "Leverage AI to improve forecasting accuracy by 50% and personalize customer experiences",
+      "engagement_strategy": "1. **Pain Point Summary**: Amazon's significant financial and operating lease obligations constrain its operational flexibility and pose risks to financial health.  \n2. **Recommended Solution**: Implement an AI/ML platform to enhance financial forecasting and optimize lease management.  \n3. **Value Proposition**: Improved forecasting accuracy by 50% will enable better financial planning, while AI-driven personalization enhances customer retention and revenue potential.  \n4. **Engagement Strategy**: Approach Amazon's finance and technology leadership teams with a tailored proposal showcasing case studies of AI-driven forecasting success in high-volume operations. Emphasize how this platform can mitigate financial risks while simultaneously driving customer engagement and revenue growth. Offer a pilot program to demonstrate immediate cost-saving potential in lease management.  \n5. **Priority**: **Medium** (important for long-term financial health but not immediately critical).  ",
+      "priority": "medium",
+      "relevance_score": 0.5
+    }
+  ]
+}

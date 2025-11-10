@@ -12,7 +12,7 @@ from ..utils.logging import setup_logger
 
 logger = setup_logger(__name__)
 
-ProviderType = Literal["openai", "sentence-transformers", "cohere"]
+ProviderType = Literal["openai", "sentence-transformers", "cohere", "azure"]
 
 
 class MultiProviderEmbeddings:
@@ -47,6 +47,8 @@ class MultiProviderEmbeddings:
                     self._embedders[provider] = self._init_sentence_transformers()
                 elif provider == "openai":
                     self._embedders[provider] = self._init_openai()
+                elif provider == "azure":
+                    self._embedders[provider] = self._init_azure()
                 elif provider == "cohere":
                     self._embedders[provider] = self._init_cohere()
                 
@@ -87,6 +89,30 @@ class MultiProviderEmbeddings:
         return OpenAIEmbeddings(
             model=model_name,
             # API key loaded from environment
+        )
+    
+    def _init_azure(self) -> Embeddings:
+        """Initialize Azure OpenAI embeddings."""
+        from langchain_openai import AzureOpenAIEmbeddings
+        
+        azure_config = self.config.get("azure", {})
+        
+        # Get Azure configuration from environment
+        api_key = os.getenv("AZURE_OPENAI_API_KEY")
+        endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+        deployment = azure_config.get("deployment") or os.getenv("AZURE_EMBEDDING_DEPLOYMENT", "text-embedding-3-large")
+        api_version = azure_config.get("api_version") or os.getenv("AZURE_EMBEDDING_API_VERSION", "2024-02-01")
+        
+        if not api_key or not endpoint:
+            raise ValueError("AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT required for Azure embeddings")
+        
+        logger.info(f"🔵 Initializing Azure OpenAI Embeddings: {deployment}")
+        
+        return AzureOpenAIEmbeddings(
+            azure_deployment=deployment,
+            api_version=api_version,
+            azure_endpoint=endpoint,
+            api_key=api_key,
         )
     
     def _init_cohere(self) -> Embeddings:
@@ -137,6 +163,7 @@ class MultiProviderEmbeddings:
                         None, embedder.embed_documents, texts
                     )
                 else:
+                    # Azure, OpenAI, Cohere all support async
                     embeddings = await embedder.aembed_documents(texts)
                 
                 logger.info(f"✅ Successfully embedded with {prov}")
@@ -197,6 +224,14 @@ class MultiProviderEmbeddings:
             elif "MiniLM" in model_name:
                 return 384
             return 768  # default
+        elif self.primary_provider == "azure":
+            # Azure uses same models as OpenAI
+            deployment = self.config.get("azure", {}).get("deployment", "text-embedding-3-large")
+            if "large" in deployment:
+                return 3072
+            elif "small" in deployment:
+                return 1536
+            return 3072  # default for text-embedding-3-large
         elif self.primary_provider == "openai":
             model_name = self.config.get("openai", {}).get("model_name", "text-embedding-3-large")
             if "large" in model_name:
