@@ -27,6 +27,10 @@ async def pitch_writer_node(state: Dict[str, Any]) -> Dict[str, Any]:
     config = state.get("config", {})
     llm_manager = state.get("llm_manager")
     
+    # Get your company name from config
+    your_company_name = config.get("your_company_name", "[Your Company]")
+    your_company_tagline = config.get("your_company_tagline", "")
+    
     # Create llm_manager from config if not in state (for hashability)
     if not llm_manager:
         from ...utils.multi_llm import MultiProviderLLM
@@ -42,48 +46,75 @@ async def pitch_writer_node(state: Dict[str, Any]) -> Dict[str, Any]:
     
     logger.info("Generating personalized pitch")
     
-    pitch_prompt = """You are an expert sales professional. Write a compelling, personalized email pitch for {company}.
+    # Build company intro line
+    company_intro = f"We're {your_company_name}"
+    if your_company_tagline:
+        company_intro += f", {your_company_tagline}"
+    company_intro += "."
+    
+    pitch_prompt = """You are an expert sales professional writing for {your_company}. Write a compelling, personalized email pitch for {target_company}.
 
 Context:
-Company: {company}
-Pain Points from 10-K: {pains_text}
-Recommended Solutions: {solutions_text}
+Your Company: {your_company}
+Target Company: {target_company}
+
+THEIR PAIN POINTS (from their 10-K filing):
+{pains_text}
+
+YOUR SOLUTIONS (with proof points):
+{solutions_text}
 
 Requirements:
-1. Start with a compelling subject line
-2. Open with a specific reference to their 10-K filing (quote a specific challenge)
-3. Position 1-2 products as solutions to their documented pains
-4. Include concrete proof points
-5. End with a clear call-to-action
-6. Keep it concise (under 250 words)
-7. Target persona: CFO or VP of Operations
+1. Start with a compelling subject line that references their specific challenge
+2. Open with a DIRECT QUOTE from their 10-K filing showing you understand their challenge
+3. Introduce {your_company} naturally in the first paragraph
+4. Present 1-2 specific solutions from the list above with:
+   - The exact product/service title
+   - How it addresses their specific pain point
+   - A concrete proof point with metrics (use the exact proof points provided)
+5. CRITICAL: Use ONLY the proof points provided above - DO NOT invent company names, metrics, or case studies
+6. Reference specific capabilities that solve their documented challenges
+7. Keep it professional, concise (200-250 words), and value-focused
+8. End with a clear, low-pressure call-to-action
+9. Target persona: C-suite executive (CEO, CFO, CTO, or COO)
 
 Format as JSON:
 {{
-  "subject": "Email subject line",
-  "body": "Full email body with specific 10-K quotes in quotation marks",
-  "persona": "CFO",
-  "key_quotes": ["Specific quote from 10-K", "Another quote"],
+  "subject": "Email subject line referencing their 10-K challenge",
+  "body": "Full email body with specific 10-K quotes in quotation marks and real proof points",
+  "persona": "CEO" or "CFO" or "CTO" or "COO",
+  "key_quotes": ["Exact quote from their 10-K", "Another quote if relevant"],
   "products_mentioned": ["product-id-1", "product-id-2"]
 }}
 
-Write a professional, value-focused pitch in valid JSON format:"""
+Write a professional, value-focused pitch using ONLY the information provided:"""
     
-    # Format context
+    # Format context with RICH product details
     pains_text = "\n".join([
-        f"- {p.get('theme')}: \"{p.get('quotes', [''])[0][:150] if p.get('quotes') else p.get('rationale', '')[:150]}...\""
+        f"• {p.get('theme')}\n  Challenge: \"{p.get('quotes', [''])[0][:200] if p.get('quotes') else p.get('rationale', '')[:200]}...\"\n  Confidence: {p.get('confidence', 0):.0%}"
         for p in pains[:3]
     ])
     
-    solutions_text = "\n".join([
-        f"- {m.get('product_id')} (Score: {m.get('score')}): {m.get('why', '')[:200]}"
-        for m in matches[:2]
-    ])
+    # Build detailed solutions text with full product info
+    solutions_parts = []
+    for m in matches[:2]:
+        product_info = m.get('product', {})
+        solution_text = f"""
+• {m.get('product_name', m.get('product_id'))} (Match Score: {m.get('score', 0):.0%})
+  Summary: {product_info.get('summary', 'N/A')}
+  Key Capabilities: {', '.join(product_info.get('capabilities', [])[:4])}
+  Proof Points:
+    {chr(10).join(['- ' + pp for pp in product_info.get('proof_points', [])[:2]])}
+  Why This Fits: {m.get('why', '')[:250]}"""
+        solutions_parts.append(solution_text)
+    
+    solutions_text = "\n".join(solutions_parts)
     
     # Create messages
-    system_message = SystemMessage(content="You are a helpful assistant that writes compelling sales pitches. Always respond with valid JSON.")
+    system_message = SystemMessage(content=f"You are a sales professional representing {your_company_name}. Write compelling pitches that reference the company's actual products and proof points. Never invent company names.")
     user_message = HumanMessage(content=pitch_prompt.format(
-        company=company,
+        your_company=your_company_name,
+        target_company=company,
         pains_text=pains_text,
         solutions_text=solutions_text
     ))

@@ -87,6 +87,8 @@ class LLMFactory:
         return {
             "vector_store_dir": "src/stores/vector",
             "catalog_store_dir": "src/stores/catalog",
+            "your_company_name": "Atidan",
+            "your_company_tagline": "a global technology services and consulting firm specializing in AI, cloud, and digital transformation",
             "embedding": {
                 "primary_provider": "azure",
                 "fallback_providers": ["sentence-transformers"],
@@ -174,7 +176,10 @@ class LLMFactory:
         
         # Provider Selection
         if os.getenv("PRIMARY_EMBEDDING_PROVIDER"):
+            logger.info(f"🔧 Setting primary embedding provider from env: {os.getenv('PRIMARY_EMBEDDING_PROVIDER')}")
             config["embedding"]["primary_provider"] = os.getenv("PRIMARY_EMBEDDING_PROVIDER")
+        else:
+            logger.info(f"⚠️ PRIMARY_EMBEDDING_PROVIDER not set, using config default: {config['embedding']['primary_provider']}")
         
         if os.getenv("PRIMARY_LLM_PROVIDER"):
             config["llm"]["primary_provider"] = os.getenv("PRIMARY_LLM_PROVIDER")
@@ -196,6 +201,13 @@ class LLMFactory:
         
         if os.getenv("CATALOG_STORE_DIR"):
             config["catalog_store_dir"] = os.getenv("CATALOG_STORE_DIR")
+        
+        # Company Information
+        if os.getenv("YOUR_COMPANY_NAME"):
+            config["your_company_name"] = os.getenv("YOUR_COMPANY_NAME")
+        
+        if os.getenv("YOUR_COMPANY_TAGLINE"):
+            config["your_company_tagline"] = os.getenv("YOUR_COMPANY_TAGLINE")
         
         return config
     

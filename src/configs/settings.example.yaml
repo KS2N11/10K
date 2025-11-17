@@ -35,7 +35,7 @@ embedding:
     
   # OpenAI Embeddings
   openai:
-    model_name: "text-embedding-3-large"
+    model_name: "text-embedding-3-large" # 3072 dimensions
     
   # Cohere Embeddings
   cohere:
@@ -107,6 +107,14 @@ chunk_overlap: 200
 # Retrieval Configuration
 top_k_chunks: 10
 top_k_products: 6
+
+# ============================================================================
+# COMPANY INFORMATION
+# ============================================================================
+
+# Your Company Information (used in pitch generation)
+your_company_name: "Atidan"  # Your company name for email pitches
+your_company_tagline: "a global technology services and consulting firm specializing in AI, cloud, and digital transformation"  # Optional tagline
 
 # ============================================================================
 # AGENT CONFIGURATION
