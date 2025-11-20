@@ -8,8 +8,11 @@ from contextlib import contextmanager
 from typing import Generator
 import os
 from dotenv import load_dotenv
-
+import logging
 from src.database.models import Base
+
+# Import scheduler models to ensure they're registered with Base.metadata
+# This MUST happen before create_all() is called
 from src.database.scheduler_models import (
     SchedulerConfig, SchedulerRun, CompanyPriority, 
     SchedulerMemory, SchedulerDecision
@@ -17,11 +20,8 @@ from src.database.scheduler_models import (
 
 load_dotenv()
 
-# Database URL from environment
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/tenk_insight"
-)
+DATABASE_URL = "postgresql://postgres:postgres@agent10k-postgres:5432/tenk_insight"
+logging.info(f"Using DATABASE_URL: {DATABASE_URL}")
 
 # Create engine with connection pooling
 engine = create_engine(
