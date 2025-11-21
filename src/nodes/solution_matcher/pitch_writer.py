@@ -10,6 +10,60 @@ from ...utils.logging import setup_logger, log_trace_event
 logger = setup_logger(__name__)
 
 
+def determine_persona(matches: List[Dict[str, Any]], pains: List[Dict[str, Any]]) -> str:
+    """
+    Intelligently determine the target persona based on product category and pain points.
+    
+    Args:
+        matches: List of product matches with categories
+        pains: List of pain points
+    
+    Returns:
+        Target persona (e.g., "CTO", "CFO", "CISO", "VP of Operations")
+    """
+    if not matches:
+        return "CFO"
+    
+    # Get the top match's category
+    top_match = matches[0]
+    product_category = top_match.get('product_category', '')
+    product_name = top_match.get('product_name', '').lower()
+    
+    # Map categories to personas
+    persona_mapping = {
+        "Security & Compliance": "CISO",
+        "Infrastructure & Cloud": "CTO",
+        "AI & Machine Learning": "CTO",
+        "Data & Analytics": "CTO",
+        "Automation & RPA": "VP of Operations",
+        "Supply Chain & Logistics": "VP of Operations",
+        "Customer Experience": "VP of Customer Success",
+        "Finance & Accounting": "CFO",
+        "Human Resources": "CHRO",
+        "Consulting & Strategy": "CEO"
+    }
+    
+    # Check for specific keywords in product name for more precision
+    # Order matters - check more specific terms first
+    if 'cybersecurity' in product_name or 'security' in product_name:
+        return "CISO"
+    elif 'supply' in product_name or 'logistics' in product_name or 'supply chain' in product_name:
+        return "VP of Operations"
+    elif 'financial' in product_name or 'finance' in product_name:
+        return "CFO"
+    elif 'ai' in product_name or 'machine learning' in product_name or 'ml' in product_name:
+        return "CTO"
+    elif 'data' in product_name or 'analytics' in product_name:
+        return "CTO"
+    elif 'customer' in product_name:
+        return "VP of Customer Success"
+    elif 'hr' in product_name or 'talent' in product_name:
+        return "CHRO"
+    
+    # Use category mapping
+    return persona_mapping.get(product_category, "CFO")
+
+
 async def pitch_writer_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Generate a personalized pitch that references specific 10-K insights.
@@ -46,75 +100,85 @@ async def pitch_writer_node(state: Dict[str, Any]) -> Dict[str, Any]:
     
     logger.info("Generating personalized pitch")
     
+    # Determine the appropriate persona based on the product/solution category
+    persona = determine_persona(matches, pains)
+    logger.info(f"Determined persona: {persona}")
+    
     # Build company intro line
     company_intro = f"We're {your_company_name}"
     if your_company_tagline:
         company_intro += f", {your_company_tagline}"
     company_intro += "."
     
-    pitch_prompt = """You are an expert sales professional writing for {your_company}. Write a compelling, personalized email pitch for {target_company}.
+    pitch_prompt = """You are writing a brief, direct sales email based on real examples from a successful sales team.
 
 Context:
 Your Company: {your_company}
 Target Company: {target_company}
+Target Persona: {persona}
+Pain Points from their 10-K: {pains_text}
+Your Solutions: {solutions_text}
 
-THEIR PAIN POINTS (from their 10-K filing):
-{pains_text}
+CRITICAL STYLE REQUIREMENTS (based on proven sales emails):
+- Write like a real person, NOT ChatGPT
+- Keep it SHORT (150-200 words max)
+- Be direct and conversational
+- Use simple, natural language
+- NO corporate buzzwords or fluff
+- NO phrases like "I hope this finds you well" or "I'd love to connect"
+- Start with a direct observation or insight
+- Reference their 10-K naturally, not formally
 
-YOUR SOLUTIONS (with proof points):
-{solutions_text}
+EMAIL STRUCTURE:
+1. Subject: Direct and specific (6-10 words) - mention company or specific insight
+2. Opening: Quick intro + why you're reaching out (1-2 sentences)
+3. Insight: Reference their 10-K challenge briefly (1-2 sentences)
+4. Solution: How you help (1-2 sentences with specific value)
+5. Social proof: Quick mention of results (1 sentence)
+6. CTA: Simple, low-pressure ask (1 sentence)
 
-Requirements:
-1. Start with a compelling subject line that references their specific challenge
-2. Open with a DIRECT QUOTE from their 10-K filing showing you understand their challenge
-3. Introduce {your_company} naturally in the first paragraph
-4. Present 1-2 specific solutions from the list above with:
-   - The exact product/service title
-   - How it addresses their specific pain point
-   - A concrete proof point with metrics (use the exact proof points provided)
-5. CRITICAL: Use ONLY the proof points provided above - DO NOT invent company names, metrics, or case studies
-6. Reference specific capabilities that solve their documented challenges
-7. Keep it professional, concise (200-250 words), and value-focused
-8. End with a clear, low-pressure call-to-action
-9. Target persona: C-suite executive (CEO, CFO, CTO, or COO)
+TONE EXAMPLES (match this style):
+✓ "Reaching out because..."
+✓ "I went through [Company]'s 10-K and noticed..."
+✓ "After reviewing [Company]'s filing, a few things stood out..."
+✓ "Quick note after digging into..."
+✓ "This is something your team is currently dealing with or planning around"
+
+AVOID:
+✗ "I hope this email finds you well"
+✗ "I would love to schedule a call"
+✗ "We are reaching out to introduce"
+✗ "Our cutting-edge solution"
+✗ Long paragraphs or formal language
 
 Format as JSON:
 {{
-  "subject": "Email subject line referencing their 10-K challenge",
-  "body": "Full email body with specific 10-K quotes in quotation marks and real proof points",
-  "persona": "CEO" or "CFO" or "CTO" or "COO",
-  "key_quotes": ["Exact quote from their 10-K", "Another quote if relevant"],
-  "products_mentioned": ["product-id-1", "product-id-2"]
+  "subject": "Short, specific subject line",
+  "body": "Direct, conversational email body (150-200 words)",
+  "persona": "{persona}",
+  "key_quotes": ["Brief quote from 10-K"],
+  "products_mentioned": ["product-id-1"]
 }}
 
-Write a professional, value-focused pitch using ONLY the information provided:"""
+Write a natural, conversational pitch in valid JSON format:"""
     
-    # Format context with RICH product details
+    # Format context
     pains_text = "\n".join([
-        f"• {p.get('theme')}\n  Challenge: \"{p.get('quotes', [''])[0][:200] if p.get('quotes') else p.get('rationale', '')[:200]}...\"\n  Confidence: {p.get('confidence', 0):.0%}"
+        f"- {p.get('theme')}: \"{p.get('quotes', [''])[0][:150] if p.get('quotes') else p.get('rationale', '')[:150]}...\""
         for p in pains[:3]
     ])
     
-    # Build detailed solutions text with full product info
-    solutions_parts = []
-    for m in matches[:2]:
-        product_info = m.get('product', {})
-        solution_text = f"""
-• {m.get('product_name', m.get('product_id'))} (Match Score: {m.get('score', 0):.0%})
-  Summary: {product_info.get('summary', 'N/A')}
-  Key Capabilities: {', '.join(product_info.get('capabilities', [])[:4])}
-  Proof Points:
-    {chr(10).join(['- ' + pp for pp in product_info.get('proof_points', [])[:2]])}
-  Why This Fits: {m.get('why', '')[:250]}"""
-        solutions_parts.append(solution_text)
-    
-    solutions_text = "\n".join(solutions_parts)
+    solutions_text = "\n".join([
+        f"- {m.get('product_name', m.get('product_id'))} (Fit Score: {m.get('score')}): {m.get('why', '')[:200]}"
+        for m in matches[:2]
+    ])
     
     # Create messages
-    system_message = SystemMessage(content=f"You are a sales professional representing {your_company_name}. Write compelling pitches that reference the company's actual products and proof points. Never invent company names.")
+    system_message = SystemMessage(content=f"You are a sales rep at {your_company_name}. Write brief, natural emails like the examples shown. Be conversational and direct. Avoid corporate speak.")
     user_message = HumanMessage(content=pitch_prompt.format(
         your_company=your_company_name,
         target_company=company,
+        persona=persona,
         pains_text=pains_text,
         solutions_text=solutions_text
     ))

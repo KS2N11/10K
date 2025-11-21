@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Rocket, Search, Play, CheckSquare, Square } from 'lucide-react';
 import apiClient, { type JobStatus } from '../services/api';
 import { LoadingSpinner, ErrorMessage, InfoMessage, SuccessMessage } from '../components/common/Feedback';
@@ -26,22 +27,22 @@ const AnalysisQueue: React.FC = () => {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [loadingSearch, setLoadingSearch] = useState(false);
 
-  // Fetch active jobs on mount and periodically
+  // Fetch all jobs (active + completed) on mount and periodically
   useEffect(() => {
     const fetchActiveJobs = async () => {
       try {
-        const response = await apiClient.getAllJobs(false); // Only active jobs
+        const response = await apiClient.getAllJobs(true); // Include completed jobs
         const jobIds = response.jobs.map(job => job.job_id);
         setActiveJobs(jobIds);
       } catch (err) {
-        console.error('Failed to fetch active jobs:', err);
+        console.error('Failed to fetch jobs:', err);
       }
     };
 
     // Fetch on mount
     fetchActiveJobs();
 
-    // Refresh active jobs every 10 seconds
+    // Refresh jobs every 10 seconds
     const interval = setInterval(fetchActiveJobs, 10000);
 
     return () => clearInterval(interval);
@@ -638,10 +639,11 @@ const AnalysisQueue: React.FC = () => {
         {/* Active Jobs Tab */}
         {activeTab === 'jobs' && (
           <div>
-            <h2 className="text-xl font-semibold mb-4">Active & Recent Jobs</h2>
+            <h2 className="text-xl font-semibold mb-4">All Analysis Jobs</h2>
+            <p className="text-gray-600 mb-4">View your current and recent batch analysis jobs (last 24 hours)</p>
 
             {activeJobs.length === 0 ? (
-              <InfoMessage message="No active jobs. Start a new analysis from the other tabs!" />
+              <InfoMessage message="No recent jobs. Start a new analysis from the other tabs!" />
             ) : (
               <div className="space-y-4">
                 {activeJobs.map((jobId) => (
@@ -665,6 +667,7 @@ const JobMonitor: React.FC<JobMonitorProps> = ({ jobId }) => {
   const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const fetchJobStatus = async () => {
     try {
@@ -704,51 +707,58 @@ const JobMonitor: React.FC<JobMonitorProps> = ({ jobId }) => {
 
   const isActive = jobStatus.status === 'QUEUED' || jobStatus.status === 'IN_PROGRESS';
 
+  // User-friendly status labels
+  const getStatusDisplay = () => {
+    if (jobStatus.status === 'COMPLETED') return { label: '✅ Completed Successfully', color: 'bg-green-100 text-green-800' };
+    if (jobStatus.status === 'IN_PROGRESS') return { label: '🔄 Analyzing Companies', color: 'bg-blue-100 text-blue-800' };
+    if (jobStatus.status === 'QUEUED') return { label: '⏳ Starting Soon', color: 'bg-gray-100 text-gray-800' };
+    if (jobStatus.status === 'FAILED') return { label: '⚠️ Some Issues Occurred', color: 'bg-yellow-100 text-yellow-800' };
+    return { label: jobStatus.status, color: 'bg-gray-100 text-gray-800' };
+  };
+
+  const statusDisplay = getStatusDisplay();
+
   return (
     <div className="card">
       <div className="flex justify-between items-start mb-4">
         <div className="flex-1">
-          <h3 className="font-semibold text-lg">Job: {jobId.slice(0, 8)}...</h3>
+          <div className="flex items-center gap-3">
+            <h3 className="font-semibold text-lg">Analysis Batch</h3>
+            <button
+              onClick={() => navigate(`/job/${jobId}`)}
+              className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+            >
+              View Details →
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">ID: {jobId.slice(0, 13)}...</p>
           
           {/* Live Progress Indicator */}
           {isActive && jobStatus.current_company && (
-            <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <div className="flex items-center gap-2 text-blue-800">
                 <div className="animate-pulse w-2 h-2 bg-blue-600 rounded-full"></div>
-                <span className="font-medium">Currently analyzing:</span>
+                <span className="font-medium text-sm">Analyzing: {jobStatus.current_company}</span>
               </div>
-              <div className="text-gray-900 font-semibold mt-1">{jobStatus.current_company}</div>
               {jobStatus.current_step && (
-                <div className="text-sm text-gray-600 mt-1">
-                  Step: {jobStatus.current_step}
+                <div className="text-xs text-gray-600 mt-1 ml-4">
+                  {jobStatus.current_step}
                 </div>
               )}
             </div>
           )}
-
-          {/* Completion Message */}
-          {!isActive && (
-            <p className="text-sm text-gray-600 mt-2">
-              {jobStatus.status === 'COMPLETED' ? '✅ Analysis complete!' : '⚠️ Job terminated'}
-            </p>
-          )}
         </div>
         
-        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-          jobStatus.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-          jobStatus.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
-          jobStatus.status === 'FAILED' ? 'bg-red-100 text-red-800' :
-          'bg-gray-100 text-gray-800'
-        }`}>
-          {jobStatus.status}
+        <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusDisplay.color}`}>
+          {statusDisplay.label}
         </span>
       </div>
 
       {/* Progress Bar with smooth animation */}
       <div className="mb-4">
         <div className="flex justify-between text-sm text-gray-600 mb-1">
-          <span>Progress: {jobStatus.completed + jobStatus.failed + jobStatus.skipped} / {jobStatus.total_companies}</span>
-          <span className="font-semibold">{progress.toFixed(1)}%</span>
+          <span>Progress</span>
+          <span className="font-semibold">{jobStatus.completed + jobStatus.failed + jobStatus.skipped} of {jobStatus.total_companies} companies</span>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
           <div
@@ -758,50 +768,49 @@ const JobMonitor: React.FC<JobMonitorProps> = ({ jobId }) => {
             style={{ width: `${progress}%` }}
           />
         </div>
+        <div className="text-right text-xs text-gray-500 mt-1">{progress.toFixed(1)}%</div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-4 gap-4 text-center">
-        <div>
-          <div className="text-2xl font-bold text-gray-800">{jobStatus.total_companies}</div>
-          <div className="text-xs text-gray-500">Total</div>
-        </div>
-        <div>
+      <div className="grid grid-cols-4 gap-3 text-center">
+        <div className="bg-green-50 p-3 rounded">
           <div className="text-2xl font-bold text-green-600">{jobStatus.completed}</div>
-          <div className="text-xs text-gray-500">Completed</div>
+          <div className="text-xs text-gray-600">Analyzed</div>
         </div>
-        <div>
-          <div className="text-2xl font-bold text-red-600">{jobStatus.failed}</div>
-          <div className="text-xs text-gray-500">Failed</div>
-        </div>
-        <div>
+        <div className="bg-yellow-50 p-3 rounded">
           <div className="text-2xl font-bold text-yellow-600">{jobStatus.skipped}</div>
-          <div className="text-xs text-gray-500">Skipped</div>
+          <div className="text-xs text-gray-600">Skipped</div>
+        </div>
+        <div className="bg-red-50 p-3 rounded">
+          <div className="text-2xl font-bold text-red-600">{jobStatus.failed}</div>
+          <div className="text-xs text-gray-600">Failed</div>
+        </div>
+        <div className="bg-gray-50 p-3 rounded">
+          <div className="text-2xl font-bold text-gray-600">{jobStatus.total_companies}</div>
+          <div className="text-xs text-gray-600">Total</div>
         </div>
       </div>
 
-      {/* Error Details (if any) */}
-      {jobStatus.errors && jobStatus.errors.length > 0 && (
-        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <h4 className="font-semibold text-red-800 mb-2 flex items-center gap-2">
-            <span className="text-lg">⚠️</span>
-            Recent Errors ({jobStatus.errors.length})
-          </h4>
-          <div className="space-y-2 max-h-40 overflow-y-auto">
-            {jobStatus.errors.map((err, idx) => (
-              <div key={idx} className="text-sm bg-white p-2 rounded border border-red-100">
-                <div className="font-medium text-gray-900">{err.company}</div>
-                <div className="text-red-700 text-xs mt-1">{err.error}</div>
-              </div>
-            ))}
-          </div>
+      {/* ETA Display for active jobs */}
+      {isActive && jobStatus.estimated_time_remaining && (
+        <div className="mt-3 text-center text-sm text-gray-600 bg-gray-50 py-2 rounded">
+          ⏱️ About {Math.ceil(jobStatus.estimated_time_remaining / 60)} minutes remaining
         </div>
       )}
 
-      {/* ETA Display for active jobs */}
-      {isActive && jobStatus.estimated_time_remaining && (
-        <div className="mt-4 text-center text-sm text-gray-600">
-          ⏱️ Estimated time remaining: {Math.ceil(jobStatus.estimated_time_remaining / 60)} minutes
+      {/* Completion Message */}
+      {jobStatus.status === 'COMPLETED' && (
+        <div className="mt-3 text-center text-sm bg-green-50 text-green-700 py-2 rounded">
+          Analysis complete! Click "View Details" to see all companies.
+        </div>
+      )}
+
+      {/* Error Summary (if any) - Simplified */}
+      {jobStatus.errors && jobStatus.errors.length > 0 && (
+        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="text-sm font-medium text-yellow-800">
+            ⚠️ {jobStatus.errors.length} companies had issues. Click "View Details" for more info.
+          </div>
         </div>
       )}
     </div>

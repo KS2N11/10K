@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
 import os
 from pathlib import Path
 import json
@@ -173,6 +174,42 @@ def get_all_jobs(
         from src.database.models import AnalysisJob, AnalysisStatus
         from datetime import datetime, timedelta
         
+        # Cleanup old completed/failed jobs (older than 1 hour)
+        cleanup_time = datetime.utcnow() - timedelta(hours=1)
+        db.query(AnalysisJob).filter(
+            AnalysisJob.status.in_([AnalysisStatus.COMPLETED, AnalysisStatus.FAILED]),
+            AnalysisJob.completed_at < cleanup_time
+        ).delete(synchronize_session=False)
+        
+        # Mark stuck jobs as failed (in progress for more than 2 hours)
+        stuck_time = datetime.utcnow() - timedelta(hours=2)
+        stuck_jobs = db.query(AnalysisJob).filter(
+            AnalysisJob.status == AnalysisStatus.IN_PROGRESS,
+            AnalysisJob.started_at < stuck_time
+        ).all()
+        
+        for stuck_job in stuck_jobs:
+            stuck_job.status = AnalysisStatus.FAILED
+            stuck_job.completed_at = datetime.utcnow()
+            stuck_job.current_step = "Timed out (stuck for >2 hours)"
+            logger.warning(f"Marked stuck job {stuck_job.job_id} as failed (stuck since {stuck_job.started_at})")
+        
+        # Mark orphaned queued jobs as failed (queued for more than 30 minutes)
+        orphaned_time = datetime.utcnow() - timedelta(minutes=30)
+        orphaned_jobs = db.query(AnalysisJob).filter(
+            AnalysisJob.status == AnalysisStatus.QUEUED,
+            AnalysisJob.created_at < orphaned_time,
+            AnalysisJob.started_at.is_(None)
+        ).all()
+        
+        for orphaned_job in orphaned_jobs:
+            orphaned_job.status = AnalysisStatus.FAILED
+            orphaned_job.completed_at = datetime.utcnow()
+            orphaned_job.current_step = "Failed to start (orphaned)"
+            logger.warning(f"Marked orphaned job {orphaned_job.job_id} as failed (queued since {orphaned_job.created_at})")
+        
+        db.commit()
+        
         query = db.query(AnalysisJob).order_by(AnalysisJob.created_at.desc())
         
         if not include_completed:
@@ -208,6 +245,89 @@ def get_all_jobs(
     
     except Exception as e:
         logger.error(f"Error getting jobs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/analysis/jobs/{job_id}/companies")
+def get_job_companies(
+    job_id: str,
+    db: Session = Depends(get_db_session)
+):
+    """
+    Get all companies analyzed in a specific job.
+    
+    Args:
+        job_id: Job UUID
+        db: Database session
+    
+    Returns:
+        List of companies in the job with their status
+    """
+    try:
+        from src.database.models import AnalysisJob, Analysis, Company
+        
+        # Find the job
+        job = db.query(AnalysisJob).filter(AnalysisJob.job_id == job_id).first()
+        if not job:
+            raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+        
+        # Get company names from job
+        company_names = job.company_names or []
+        
+        # Fetch analyses created during this job's timeframe
+        analyses = []
+        if job.started_at:
+            end_time = job.completed_at or datetime.utcnow()
+            analyses = db.query(Analysis).join(Company).filter(
+                Analysis.created_at >= job.started_at,
+                Analysis.created_at <= end_time,
+                Company.name.in_(company_names) if company_names else True
+            ).all()
+        
+        # Build company status map
+        completed_companies = {a.company.name: a.company for a in analyses}
+        
+        companies_list = []
+        for name in company_names:
+            if name in completed_companies:
+                company = completed_companies[name]
+                companies_list.append({
+                    "name": company.name,
+                    "ticker": company.ticker,
+                    "cik": company.cik,
+                    "status": "completed",
+                    "company_id": company.id
+                })
+            else:
+                # Check if it's the current company being processed
+                if job.current_company and name == job.current_company:
+                    companies_list.append({
+                        "name": name,
+                        "ticker": None,
+                        "cik": None,
+                        "status": "in_progress",
+                        "company_id": None
+                    })
+                else:
+                    # Could be failed, skipped, or pending
+                    companies_list.append({
+                        "name": name,
+                        "ticker": None,
+                        "cik": None,
+                        "status": "pending",
+                        "company_id": None
+                    })
+        
+        return {
+            "job_id": job_id,
+            "companies": companies_list,
+            "count": len(companies_list)
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting job companies: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

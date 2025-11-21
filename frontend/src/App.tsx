@@ -7,6 +7,7 @@ import CompanyInsights from './pages/CompanyInsights';
 import TopPitches from './pages/TopPitches';
 import Metrics from './pages/Metrics';
 import CatalogManager from './pages/CatalogManager';
+import JobDetails from './pages/JobDetails';
 
 const App: React.FC = () => {
   return (
@@ -20,6 +21,7 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/analysis-queue" element={<AnalysisQueue />} />
+            <Route path="/job/:jobId" element={<JobDetails />} />
             <Route path="/company-insights" element={<CompanyInsights />} />
             <Route path="/top-pitches" element={<TopPitches />} />
             <Route path="/metrics" element={<Metrics />} />

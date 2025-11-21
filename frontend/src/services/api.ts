@@ -1,6 +1,17 @@
 import axios, { AxiosInstance } from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Runtime config has priority over build-time env
+declare global {
+  interface Window {
+    __RUNTIME_CONFIG__?: {
+      VITE_API_URL: string;
+    };
+  }
+}
+
+const API_BASE_URL = window.__RUNTIME_CONFIG__?.VITE_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+console.log('API Base URL:', API_BASE_URL);
 
 export interface Company {
   id: number;
@@ -173,6 +184,11 @@ class ApiClient {
     const response = await this.client.get('/api/v2/analysis/jobs', {
       params: { include_completed: includeCompleted, limit: 20 }
     });
+    return response.data;
+  }
+
+  async getJobCompanies(jobId: string): Promise<{ job_id: string; companies: Array<{ name: string; ticker?: string; cik?: string; status: string; }>; count: number }> {
+    const response = await this.client.get(`/api/v2/analysis/jobs/${jobId}/companies`);
     return response.data;
   }
 

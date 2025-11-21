@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, Building2, Clock, ChevronDown, ChevronUp, FileText, CheckCircle, AlertCircle, ExternalLink, Quote } from 'lucide-react';
 import apiClient, { CompanyDetails } from '../services/api';
 import { LoadingSpinner, ErrorMessage } from '../components/common/Feedback';
@@ -18,6 +19,7 @@ interface Analysis {
 
 // Full implementation mirroring Streamlit's company_insights.py
 const CompanyInsights: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [filteredAnalyses, setFilteredAnalyses] = useState<Analysis[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -35,6 +37,39 @@ const CompanyInsights: React.FC = () => {
   useEffect(() => {
     filterAndSortAnalyses();
   }, [searchQuery, sortBy, analyses]);
+
+  // Auto-expand if company ID is provided in URL
+  useEffect(() => {
+    const companyIdParam = searchParams.get('id');
+    if (companyIdParam && analyses.length > 0) {
+      const companyId = parseInt(companyIdParam);
+      console.log('Auto-expand triggered for company ID:', companyId);
+      
+      // Check if this company exists in the analyses
+      const analysis = analyses.find(a => a.company_id === companyId);
+      console.log('Found analysis:', analysis);
+      
+      if (analysis && expandedCompanyId !== companyId) {
+        console.log('Loading company details...');
+        // Auto-expand this company
+        loadCompanyDetails(companyId);
+        
+        // Scroll to the company after a delay to ensure it's rendered
+        setTimeout(() => {
+          const element = document.getElementById(`company-${companyId}`);
+          console.log('Scrolling to element:', element);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Highlight the card briefly
+            element.classList.add('ring-4', 'ring-primary-400');
+            setTimeout(() => {
+              element.classList.remove('ring-4', 'ring-primary-400');
+            }, 2000);
+          }
+        }, 800);
+      }
+    }
+  }, [analyses, searchParams]);
 
   const fetchAnalyses = async () => {
     try {
@@ -181,7 +216,11 @@ const CompanyInsights: React.FC = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
             {filteredAnalyses.map((analysis) => (
-              <div key={analysis.company_id} className="card hover:shadow-lg transition-shadow">
+              <div 
+                key={analysis.company_id} 
+                id={`company-${analysis.company_id}`}
+                className="card hover:shadow-lg transition-shadow"
+              >
                 {/* Company header */}
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
