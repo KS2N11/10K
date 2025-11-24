@@ -29,6 +29,9 @@ const CompanyInsights: React.FC = () => {
   const [expandedCompanyId, setExpandedCompanyId] = useState<number | null>(null);
   const [companyDetails, setCompanyDetails] = useState<CompanyDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [pitchData, setPitchData] = useState<any>(null);
+  const [loadingPitch, setLoadingPitch] = useState(false);
+  const [pitchCompanyId, setPitchCompanyId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchAnalyses();
@@ -124,6 +127,9 @@ const CompanyInsights: React.FC = () => {
     try {
       setLoadingDetails(true);
       setExpandedCompanyId(companyId);
+      // Hide pitch when showing details
+      setPitchCompanyId(null);
+      setPitchData(null);
       const data = await apiClient.getCompanyAnalysis(companyId);
       setCompanyDetails(data);
     } catch (err: any) {
@@ -137,6 +143,36 @@ const CompanyInsights: React.FC = () => {
   const openFilingDocument = (companyId: number) => {
     const url = apiClient.getFilingDocumentUrl(companyId);
     window.open(url, '_blank');
+  };
+
+  const fetchPitch = async (companyId: number) => {
+    // If pitch is already shown for this company, hide it
+    if (pitchCompanyId === companyId && pitchData) {
+      setPitchCompanyId(null);
+      setPitchData(null);
+      return;
+    }
+
+    try {
+      setLoadingPitch(true);
+      setPitchCompanyId(companyId);
+      // Hide details when showing pitch
+      setExpandedCompanyId(null);
+      setCompanyDetails(null);
+      const response = await apiClient.getCompanyAnalysis(companyId);
+      // Extract pitches from the company analysis response
+      if (response.pitches && response.pitches.length > 0) {
+        setPitchData(response.pitches[0]); // Get the first pitch
+      } else {
+        setError('No pitch found for this company');
+        setPitchData(null);
+      }
+    } catch (err: any) {
+      setError(`Failed to fetch pitch: ${err.message}`);
+      setPitchData(null);
+    } finally {
+      setLoadingPitch(false);
+    }
   };
 
   const getScoreColor = (score: number) => {
@@ -278,7 +314,54 @@ const CompanyInsights: React.FC = () => {
                       </>
                     )}
                   </button>
+                  
+                  <button
+                    onClick={() => fetchPitch(analysis.company_id)}
+                    className="flex-1 py-2 px-4 bg-success-500 hover:bg-success-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
+                    disabled={loadingPitch && pitchCompanyId === analysis.company_id}
+                  >
+                    <Quote size={18} />
+                    {loadingPitch && pitchCompanyId === analysis.company_id ? 'Loading...' : 
+                     pitchCompanyId === analysis.company_id && pitchData ? 'Hide Pitch' : 'Fetch Pitch'}
+                  </button>
                 </div>
+
+                {/* Pitch details */}
+                {pitchCompanyId === analysis.company_id && pitchData && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="bg-success-50 border border-success-200 rounded-lg p-4">
+                      <h4 className="font-bold text-gray-900 flex items-center gap-2 mb-3">
+                        <Quote size={18} className="text-success-500" />
+                        Sales Pitch
+                        {pitchData.overall_score && (
+                          <span className={`ml-2 ${getScoreColor(pitchData.overall_score)} text-white text-sm px-3 py-1 rounded`}>
+                            Score: {pitchData.overall_score}/100
+                          </span>
+                        )}
+                      </h4>
+                      <div className="space-y-4">
+                        {pitchData.persona && (
+                          <div className="bg-white rounded-lg p-3 shadow-sm">
+                            <p className="text-xs font-semibold text-gray-600 mb-1">Persona:</p>
+                            <p className="text-gray-800">{pitchData.persona}</p>
+                          </div>
+                        )}
+                        {pitchData.subject && (
+                          <div className="bg-white rounded-lg p-3 shadow-sm">
+                            <p className="text-xs font-semibold text-gray-600 mb-1">Subject:</p>
+                            <p className="text-gray-800 font-medium">{pitchData.subject}</p>
+                          </div>
+                        )}
+                        {pitchData.body && (
+                          <div className="bg-white rounded-lg p-4 shadow-sm">
+                            <p className="text-xs font-semibold text-gray-600 mb-2">Pitch Body:</p>
+                            <p className="text-gray-800 whitespace-pre-wrap">{pitchData.body}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Expanded details */}
                 {expandedCompanyId === analysis.company_id && (
