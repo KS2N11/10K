@@ -335,8 +335,8 @@ class MarketCapLookup:
                         "industry": info.get("industry", "Unknown")
                     }
             
-            # Small delay between batches to respect SEC rate limits (10 requests/second)
+            # Minimal delay between batches (SEC API is reliable and has no strict rate limit)
             if i + max_concurrent < len(companies):
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.05)
         
         return results

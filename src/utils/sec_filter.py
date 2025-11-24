@@ -254,11 +254,26 @@ class SECCompanyFilter:
         if not market_cap and not sector and not industry:
             return all_companies[:limit]
         
-        # OPTIMIZATION: Randomize company order to get diverse results
-        # This helps find matches faster instead of checking sequentially
+        # SMART ORDERING: For MEGA/LARGE caps, prioritize companies with tickers (likely larger)
+        # For SMALL/MID caps, randomize for diversity
         import random
-        randomized_companies = list(all_companies)
-        random.shuffle(randomized_companies)
+        if market_cap and any(tier in ["MEGA", "LARGE"] for tier in market_cap):
+            # Prioritize companies WITH tickers (MEGA/LARGE caps almost always have tickers)
+            companies_with_ticker = [c for c in all_companies if c.get("ticker")]
+            companies_without_ticker = [c for c in all_companies if not c.get("ticker")]
+            
+            # Sort ticker companies by CIK (older CIKs = larger/older companies usually)
+            companies_with_ticker.sort(key=lambda x: x.get("cik", ""))
+            
+            # Put tickers first, then shuffle no-ticker ones
+            random.shuffle(companies_without_ticker)
+            randomized_companies = companies_with_ticker + companies_without_ticker
+            logger.info(f"Searching MEGA/LARGE caps: prioritizing {len(companies_with_ticker)} companies with tickers")
+        else:
+            # For SMALL/MID caps, full randomization works well (more of them in database)
+            randomized_companies = list(all_companies)
+            random.shuffle(randomized_companies)
+            logger.info(f"Searching SMALL/MID caps: randomizing all {len(randomized_companies)} companies")
         
         # Filter by market cap (and optionally sector/industry)
         if use_realtime_lookup:
@@ -289,18 +304,30 @@ class SECCompanyFilter:
         logger.info(f"Using real-time market cap lookup for filtering...")
         logger.info(f"Filters: market_cap={market_cap_tiers}, sectors={sector_filter}, industries={industry_filter}")
         
+
+        
         # OPTIMIZATION: Only check tickers until we have enough matches
         # Check in batches and stop early if we reach the limit
         filtered = []
         checked_count = 0
         
-        # Process companies in chunks (REDUCED to avoid rate limiting)
-        chunk_size = 20  # Check only 20 companies at a time to reduce API calls
+        # Adaptive batch size based on market cap tier
+        if any(tier in ["MEGA", "LARGE"] for tier in market_cap_tiers):
+            chunk_size = 100  # MEGA/LARGE caps are rare, check many companies quickly
+            max_companies_to_check = 1500  # Check up to 1500 to find all MEGA/LARGE (MSFT at pos ~1085)
+        else:
+            chunk_size = 50  # SMALL/MID caps are common, smaller batches work fine
+            max_companies_to_check = 200  # Check up to 200 companies for SMALL/MID
         
-        for i in range(0, len(companies), chunk_size):
+        for i in range(0, min(len(companies), max_companies_to_check), chunk_size):
             # Stop if we already have enough matches
             if len(filtered) >= limit:
                 logger.info(f"Found {len(filtered)} matches, stopping early")
+                break
+            
+            # Stop if we've checked enough companies
+            if checked_count >= max_companies_to_check:
+                logger.info(f"Checked {checked_count} companies (limit: {max_companies_to_check}), stopping")
                 break
             
             chunk = companies[i:i + chunk_size]
@@ -315,8 +342,8 @@ class SECCompanyFilter:
             
             logger.info(f"Checking batch {batch_num}: {len(valid_companies)} companies (checked {checked_count} total, found {len(filtered)} matches so far)")
             
-            # Lookup this batch with sector info using CIK (SEC API is fast and reliable)
-            ticker_to_info = await self.market_cap_lookup.batch_lookup_with_sector(valid_companies, max_concurrent=20)
+            # Lookup this batch with sector info - balanced concurrency (30 is sweet spot)
+            ticker_to_info = await self.market_cap_lookup.batch_lookup_with_sector(valid_companies, max_concurrent=30)
             
             # Check matches in this batch
             for company in chunk:
