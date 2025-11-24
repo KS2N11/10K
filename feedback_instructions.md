@@ -2,7 +2,7 @@
 
 ## Implementation Status
 
-### ✅ COMPLETED
+### ✅ COMPLETED & DEPLOYED
 1. **Separate view for each analysis job** ✅ FULLY DEPLOYED
    - ✅ Created new `/job/:jobId` route with detailed job view page
    - ✅ Shows all companies in a specific batch with their status (completed/failed/skipped/in-progress)
@@ -18,12 +18,13 @@
    - ✅ Visual highlighting when landing on specific company
    - ✅ Jobs persist for 24 hours (not just active ones)
    - ✅ Real-time progress updates with live company being analyzed
-   - **Deployed**:Not deployed
+   - **Deployed**: November 21, 2025 @ 12:38 UTC
+   - **Backend URL**: https://agent10k-backend.jollycoast-bd873abf.westus.azurecontainerapps.io
+   - **Frontend URL**: https://agent10k-frontend.jollycoast-bd873abf.westus.azurecontainerapps.io
+   - **Git Commit**: f3db158
+   - **Backup Branch**: backup-before-persona-and-jobs-20251121-165743
 
-### 🔄 IN PROGRESS
-
-### ✅ COMPLETED (Ready to Deploy)
-4. **Fix designation/persona in pitch generation** ✅ FULLY TESTED
+4. **Fix designation/persona in pitch generation** ✅ FULLY DEPLOYED
    - ✅ Intelligent persona assignment based on product category
    - ✅ Maps Security → CISO, Data/AI → CTO, Finance → CFO, Supply Chain → VP Operations, etc.
    - ✅ Complete rewrite of pitch generation to match sample email style
@@ -31,7 +32,14 @@
    - ✅ No corporate buzzwords or ChatGPT-ish language
    - ✅ Natural opening patterns from sales team examples
    - ✅ **Unit tests passing**: All 18 tests passed (categorization + persona mapping + keyword override)
-   - **Status**: Code changes complete and tested. Ready to deploy alongside Point 1.
+   - **Deployed**: November 21, 2025 @ 12:38 UTC (same deployment as Point 1)
+   - **Files Modified**: 
+     - `src/nodes/solution_matcher/pitch_writer.py` - Added determine_persona() function
+     - `src/nodes/solution_matcher/fit_scorer.py` - Added categorize_product() function
+   - **Test Coverage**: 18/18 tests passing in test_persona_mapping.py
+
+### 🔄 IN PROGRESS
+*(None currently)*
 
 ### ⏸️ PENDING
 2. **Filter search for sector based companies**

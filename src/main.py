@@ -4,6 +4,7 @@ FastAPI application entry point for 10K Insight Agent.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+import os
 
 from .api.routes import router, load_config
 from .api.routes_v2 import router as router_v2
@@ -24,10 +25,19 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+# Configure CORS from environment variable or default to permissive for development
+cors_origins = os.getenv("CORS_ORIGINS", "*")
+if cors_origins == "*":
+    allow_origins = ["*"]
+    logger.warning("CORS configured to allow all origins (*). Set CORS_ORIGINS env var for production.")
+else:
+    allow_origins = [origin.strip() for origin in cors_origins.split(",")]
+    logger.info(f"CORS configured for origins: {allow_origins}")
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

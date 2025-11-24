@@ -120,6 +120,23 @@ curl -X PUT http://localhost:8000/api/scheduler/config \
 - **API Server**: http://localhost:8000
 - **API Documentation**: http://localhost:8000/docs
 
+### Production Deployment
+
+For deploying to Azure Container Apps or other cloud platforms:
+
+📘 **See [AZURE_DEPLOYMENT.md](AZURE_DEPLOYMENT.md)** for complete deployment guide including:
+- Container configuration with runtime environment variables
+- Azure Container Apps setup
+- PostgreSQL database options
+- CORS configuration
+- Monitoring and troubleshooting
+
+**Quick deployment checklist:**
+- Set `VITE_API_URL` environment variable on frontend container to backend URL
+- Configure `CORS_ORIGINS` on backend to include frontend URL
+- Use Azure Database for PostgreSQL or containerized PostgreSQL
+- Add at least one LLM API key (Groq, OpenAI, or Azure OpenAI)
+
 ---
 
 ## Usage

@@ -30,13 +30,18 @@ async def product_retriever_node(state: Dict[str, Any]) -> Dict[str, Any]:
     # Create embedder from config if not in state (for hashability)
     if not embedder:
         from ...utils.multi_embeddings import MultiProviderEmbeddings
-        embedder = MultiProviderEmbeddings(config=config)
+        emb_config = config.get("embedding", {})
+        embedder = MultiProviderEmbeddings(
+            primary_provider=emb_config.get("primary_provider", "azure"),
+            fallback_providers=emb_config.get("fallback_providers", ["sentence-transformers"]),
+            config=emb_config
+        )
     
     logger.info(f"Retrieving products for {len(pains)} pain points")
     
     try:
         # Load product catalog
-        catalog_path = Path("src/knowledge/products.json")
+        catalog_path = Path("src/knowledge/products_atidan.json")
         if not catalog_path.exists():
             logger.warning("Product catalog not found, using empty catalog")
             products = []

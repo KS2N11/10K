@@ -250,39 +250,52 @@ class SECCompanyFilter:
         
         logger.info(f"Fetched {len(all_companies)} companies from SEC")
         
-        # If no market cap filter, return first 'limit' companies
-        if not market_cap:
+        # If no filters at all, return first 'limit' companies
+        if not market_cap and not sector and not industry:
             return all_companies[:limit]
         
-        # Filter by market cap
+        # OPTIMIZATION: Randomize company order to get diverse results
+        # This helps find matches faster instead of checking sequentially
+        import random
+        randomized_companies = list(all_companies)
+        random.shuffle(randomized_companies)
+        
+        # Filter by market cap (and optionally sector/industry)
         if use_realtime_lookup:
             filtered_companies = await self._filter_by_realtime_market_cap(
-                all_companies, market_cap, limit
+                randomized_companies, market_cap or [], limit,
+                sector_filter=sector, industry_filter=industry
             )
         else:
+            # Static mode only supports market cap filtering
+            if sector or industry:
+                logger.warning("Sector/Industry filtering only available with real-time lookup. Use use_realtime=True")
             filtered_companies = self._filter_by_static_market_cap(
-                all_companies, market_cap, limit
+                all_companies, market_cap or [], limit
             )
         
-        logger.info(f"Filtered to {len(filtered_companies)} companies matching {market_cap}")
+        logger.info(f"Filtered to {len(filtered_companies)} companies")
         return filtered_companies
     
     async def _filter_by_realtime_market_cap(
         self,
         companies: List[Dict[str, Any]],
         market_cap_tiers: List[str],
-        limit: int
+        limit: int,
+        sector_filter: Optional[List[str]] = None,
+        industry_filter: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
-        """Filter using real-time Yahoo Finance market cap lookup"""
+        """Filter using real-time Yahoo Finance market cap lookup with sector/industry filtering"""
         logger.info(f"Using real-time market cap lookup for filtering...")
+        logger.info(f"Filters: market_cap={market_cap_tiers}, sectors={sector_filter}, industries={industry_filter}")
         
         # OPTIMIZATION: Only check tickers until we have enough matches
         # Check in batches and stop early if we reach the limit
         filtered = []
         checked_count = 0
         
-        # Process companies in chunks
-        chunk_size = 50  # Check 50 companies at a time
+        # Process companies in chunks (REDUCED to avoid rate limiting)
+        chunk_size = 20  # Check only 20 companies at a time to reduce API calls
         
         for i in range(0, len(companies), chunk_size):
             # Stop if we already have enough matches
@@ -291,18 +304,19 @@ class SECCompanyFilter:
                 break
             
             chunk = companies[i:i + chunk_size]
-            tickers = [c["ticker"] for c in chunk if c.get("ticker")]
+            # Filter out companies without ticker
+            valid_companies = [c for c in chunk if c.get("ticker")]
             
-            if not tickers:
+            if not valid_companies:
                 continue
             
-            checked_count += len(tickers)
+            checked_count += len(valid_companies)
             batch_num = (i // chunk_size) + 1
             
-            logger.info(f"Checking batch {batch_num}: {len(tickers)} companies (checked {checked_count} total, found {len(filtered)} matches so far)")
+            logger.info(f"Checking batch {batch_num}: {len(valid_companies)} companies (checked {checked_count} total, found {len(filtered)} matches so far)")
             
-            # Lookup this batch (reduced concurrency for reliability)
-            ticker_to_tier = await self.market_cap_lookup.batch_lookup(tickers, max_concurrent=5)
+            # Lookup this batch with sector info using CIK (SEC API is fast and reliable)
+            ticker_to_info = await self.market_cap_lookup.batch_lookup_with_sector(valid_companies, max_concurrent=20)
             
             # Check matches in this batch
             for company in chunk:
@@ -310,12 +324,35 @@ class SECCompanyFilter:
                     break
                     
                 ticker = company["ticker"]
-                tier = ticker_to_tier.get(ticker)
+                info = ticker_to_info.get(ticker)
                 
-                if tier and tier.value.upper() in [t.upper() for t in market_cap_tiers]:
-                    company["market_cap_tier"] = tier.value.upper()
-                    filtered.append(company)
-                    logger.info(f"✓ Match found: {company['name']} ({ticker}) - {tier.value}")
+                if not info:
+                    continue
+                
+                tier = info.get("tier")
+                sector = info.get("sector", "Unknown")
+                industry = info.get("industry", "Unknown")
+                
+                # Check market cap tier
+                if not tier or tier.value.upper() not in [t.upper() for t in market_cap_tiers]:
+                    continue
+                
+                # Check sector filter (if provided) - MUST match, no "Unknown" allowed
+                if sector_filter:
+                    if sector == "Unknown" or sector not in sector_filter:
+                        continue
+                
+                # Check industry filter (if provided) - MUST match, no "Unknown" allowed
+                if industry_filter:
+                    if industry == "Unknown" or industry not in industry_filter:
+                        continue
+                
+                # All filters passed!
+                company["market_cap_tier"] = tier.value.upper()
+                company["sector"] = sector
+                company["industry"] = industry
+                filtered.append(company)
+                logger.info(f"✓ Match: {company['name']} ({ticker}) - {tier.value}, {sector}, {industry}")
         
         logger.info(f"Real-time lookup complete: Found {len(filtered)} matches after checking {checked_count} companies")
         return filtered

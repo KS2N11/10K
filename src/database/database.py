@@ -20,7 +20,7 @@ from src.database.scheduler_models import (
 
 load_dotenv()
 
-DATABASE_URL = "postgresql://postgres:postgres@agent10k-postgres:5432/tenk_insight"
+DATABASE_URL =os.getenv("DATABASE_URL") or "postgresql://postgres:postgres@agent10k-postgres:5432/tenk_insight"
 logging.info(f"Using DATABASE_URL: {DATABASE_URL}")
 
 # Create engine with connection pooling

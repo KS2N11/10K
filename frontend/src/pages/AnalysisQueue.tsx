@@ -21,7 +21,7 @@ const AnalysisQueue: React.FC = () => {
   const [loadingPreview, setLoadingPreview] = useState(false);
   
   // New state for features
-  const [useRealtimeLookup, setUseRealtimeLookup] = useState(false);
+  const [useRealtimeLookup] = useState(true); // Always use real-time for accurate sector filtering
   const [selectedCompanies, setSelectedCompanies] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -457,60 +457,18 @@ const AnalysisQueue: React.FC = () => {
             </div>
 
             {/* Real-time Lookup Toggle */}
-            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useRealtimeLookup}
-                  onChange={(e) => setUseRealtimeLookup(e.target.checked)}
-                  className="rounded border-gray-300"
-                />
-                <span className="text-sm font-medium">
-                  Use real-time market cap lookup
-                  <span className="text-gray-600 ml-1 font-normal">
-                    (slower but covers all 14,000+ companies)
-                  </span>
-                </span>
-              </label>
-              
-              {useRealtimeLookup && (
-                <div className="mt-2 ml-6 space-y-1">
-                  {limit <= 20 && (
-                    <div className="mb-2 p-2 bg-orange-50 border border-orange-200 rounded">
-                      <p className="text-xs text-orange-700 font-medium">
-                        ⚡ For {limit} companies, <strong>static mode is faster</strong> (instant results)
-                      </p>
-                      <p className="text-xs text-orange-600 mt-1">
-                        Real-time mode checks ALL 14,000+ companies to find matches. For small queries, this is overkill.
-                      </p>
-                    </div>
-                  )}
-                  <p className="text-xs text-yellow-700">
-                    ⚠️ Real-time lookup queries Yahoo Finance. Expected time:
-                  </p>
-                  <p className="text-xs text-yellow-600 ml-3">
-                    • 10 companies: ~30-60 seconds (checking 50-100 companies)
-                  </p>
-                  <p className="text-xs text-yellow-600 ml-3">
-                    • 25 companies: ~60-120 seconds (checking 100-200 companies)
-                  </p>
-                  <p className="text-xs text-yellow-600 ml-3">
-                    • 50 companies: ~2-3 minutes (checking 200-300 companies)
-                  </p>
-                  <p className="text-xs text-yellow-600 ml-3">
-                    • 100 companies: ~3-5 minutes (checking 300-500 companies)
-                  </p>
-                  <p className="text-xs text-yellow-700 mt-1 font-medium">
-                    💡 Recommendation: Disable real-time for queries under 20 companies
-                  </p>
-                </div>
-              )}
-              
-              {!useRealtimeLookup && (
-                <p className="text-xs text-gray-600 mt-2 ml-6">
-                  ℹ️ Using fast static mapping (~100 well-known companies). Enable real-time only if you need lesser-known companies.
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-blue-900">
+                  ℹ️ Real-time market cap and sector lookup enabled
                 </p>
-              )}
+                <p className="text-xs text-blue-700">
+                  Searches all 14,000+ SEC companies with live market cap and sector data
+                </p>
+                <p className="text-xs text-blue-600 mt-2">
+                  ⏱️ Expected time: ~30-60 seconds for 10 companies, ~2-3 minutes for 50 companies
+                </p>
+              </div>
             </div>
 
             {/* Force Re-analyze Option */}

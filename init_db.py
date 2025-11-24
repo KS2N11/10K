@@ -9,6 +9,9 @@ import os
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
+# Import all models to ensure they're registered with Base
+from src.database.models import Base, Company, Analysis, PainPoint, ProductMatch, Pitch, AnalysisJob
+from src.database.scheduler_models import SchedulerConfig, SchedulerRun, CompanyPriority, SchedulerMemory, SchedulerDecision
 from src.database.database import init_db
 
 if __name__ == "__main__":
@@ -26,6 +29,11 @@ if __name__ == "__main__":
         print("  - pitches")
         print("  - analysis_jobs")
         print("  - system_metrics")
+        print("  - scheduler_config")
+        print("  - scheduler_runs")
+        print("  - company_priorities")
+        print("  - scheduler_memory")
+        print("  - scheduler_decisions")
         print("\n🎉 You can now start the API server and Streamlit app!")
         
     except Exception as e:

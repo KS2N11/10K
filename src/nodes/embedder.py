@@ -29,7 +29,12 @@ async def embedder_node(state: Dict[str, Any]) -> Dict[str, Any]:
     # Create embedder from config if not in state (for hashability)
     if not embedder:
         from ..utils.multi_embeddings import MultiProviderEmbeddings
-        embedder = MultiProviderEmbeddings(config=config)
+        emb_config = config.get("embedding", {})
+        embedder = MultiProviderEmbeddings(
+            primary_provider=emb_config.get("primary_provider", "azure"),
+            fallback_providers=emb_config.get("fallback_providers", ["sentence-transformers"]),
+            config=emb_config
+        )
     
     if not file_path:
         logger.error("No file path provided to embedder")

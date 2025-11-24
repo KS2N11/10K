@@ -107,7 +107,7 @@ async def company_resolver_node(state: Dict[str, Any]) -> Dict[str, Any]:
         trace.append(log_trace_event(
             logger,
             "CompanyResolver",
-            "disambiguation_required",
+            "disambiguation_required", 
             f"Found {len(candidates)} candidates for: {company_name}",
             {"candidates": candidates}
         ).to_dict())

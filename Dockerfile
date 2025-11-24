@@ -8,16 +8,14 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl && \
-    rm -rf /var/lib/apt/lists/* && \
-    curl -LsSf https://astral.sh/uv/install.sh | sh
+# Copy requirements first for better layer caching
+COPY requirements.txt pyproject.toml ./
 
-ENV PATH="/root/.local/bin:${PATH}"
+# Install dependencies using pip
+RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy the rest of the application
 COPY . /app
-
-RUN uv pip install --system --no-cache .
 
 EXPOSE 8000
 

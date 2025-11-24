@@ -87,8 +87,8 @@ class LLMFactory:
         return {
             "vector_store_dir": "src/stores/vector",
             "catalog_store_dir": "src/stores/catalog",
-            "your_company_name": "Atidan",
-            "your_company_tagline": "a global technology services and consulting firm specializing in AI, cloud, and digital transformation",
+            "your_company_name": "[Your Company]",
+            "your_company_tagline": "",
             "embedding": {
                 "primary_provider": "azure",
                 "fallback_providers": ["sentence-transformers"],
