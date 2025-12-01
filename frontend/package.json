@@ -10,14 +10,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@azure/msal-browser": "^4.26.2",
+    "@azure/msal-react": "^3.0.22",
+    "axios": "^1.7.2",
+    "clsx": "^2.1.1",
+    "date-fns": "^3.6.0",
+    "lucide-react": "^0.400.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.0",
-    "axios": "^1.7.2",
-    "recharts": "^2.12.7",
-    "date-fns": "^3.6.0",
-    "lucide-react": "^0.400.0",
-    "clsx": "^2.1.1"
+    "recharts": "^2.12.7"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",
