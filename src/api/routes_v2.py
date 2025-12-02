@@ -371,7 +371,8 @@ def search_companies(
                     "ticker": c.ticker,
                     "industry": c.industry,
                     "sector": c.sector,
-                    "market_cap": c.market_cap.value if c.market_cap else None
+                    "market_cap": c.market_cap.value if c.market_cap else None,
+                    "market_cap_value": c.market_cap_value  # Actual dollar value
                 }
                 for c in companies
             ],
@@ -591,6 +592,8 @@ def get_all_analyses(
                     "company_name": a.company.name,
                     "company_ticker": a.company.ticker,
                     "company_cik": a.company.cik,
+                    "company_market_cap": a.company.market_cap.value if a.company.market_cap else None,
+                    "company_market_cap_value": a.company.market_cap_value,
                     "filing_date": a.filing_date.isoformat(),
                     "completed_at": a.completed_at.isoformat() if a.completed_at else None,
                     "pain_points_count": len(a.pain_points),
@@ -633,6 +636,8 @@ def get_top_pitches(
                     "id": p.id,
                     "company_name": p.analysis.company.name,
                     "company_ticker": p.analysis.company.ticker,
+                    "company_market_cap": p.analysis.company.market_cap.value if p.analysis.company.market_cap else None,
+                    "company_market_cap_value": p.analysis.company.market_cap_value,
                     "persona": p.persona,
                     "subject": p.subject,
                     "body": p.body,

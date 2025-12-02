@@ -161,8 +161,32 @@ class SchedulerAgent:
         
         candidates = []
         
+        # Market cap thresholds configuration
+        # If strict_small_cap_threshold is set in config, use strict filtering
+        # Otherwise, use tiered approach: $2B -> $4B -> $10B -> $50B -> unlimited
+        strict_threshold = self.config.get("strict_small_cap_threshold")
+        use_strict_mode = strict_threshold is not None
+        
+        if use_strict_mode:
+            small_cap_threshold = strict_threshold
+            logger.info(f"Using STRICT mode: Only companies < ${small_cap_threshold:,}")
+        else:
+            # Tiered thresholds: gradually expand if not enough candidates
+            tiered_thresholds = [
+                2_000_000_000,   # $2B - Small cap
+                4_000_000_000,   # $4B - Small-to-Mid cap
+                10_000_000_000,  # $10B - Mid cap
+                50_000_000_000,  # $50B - Large cap
+                None             # Unlimited - all companies
+            ]
+            logger.info(f"Using TIERED mode: $2B -> $4B -> $10B -> $50B -> unlimited")
+            logger.info(f"Using TIERED mode: $2B -> $4B -> $10B -> $50B -> unlimited")
+        
         # Get companies for each market cap tier in priority order
         sec_filter = SECCompanyFilter(self.config.get("sec_user_agent"))
+        
+        # Collect ALL potential candidates first (before filtering by market cap)
+        all_potential_candidates = []
         
         for market_cap in market_cap_priority:
             logger.info(f"Fetching {market_cap} cap companies...")
@@ -175,6 +199,11 @@ class SchedulerAgent:
                 use_realtime_lookup=False  # Use static mapping for reliability
             )
             
+            # Handle None or empty results
+            if companies is None:
+                logger.warning(f"search_companies returned None for {market_cap} cap")
+                companies = []
+            
             # Enrich with database history
             for company in companies:
                 cik = company.get("cik")
@@ -182,6 +211,11 @@ class SchedulerAgent:
                 with get_db() as db:
                     # Check if company exists in database
                     db_company = CompanyRepository.get_by_cik(db, cik)
+                    
+                    if not db_company:
+                        # Company not in database yet, skip it
+                        logger.debug(f"Skipping {company.get('name')} - not in database")
+                        continue
                     
                     # Get latest analysis
                     latest_analysis = None
@@ -203,6 +237,9 @@ class SchedulerAgent:
                         'has_high_value_matches': priority.has_high_value_matches if priority else False,
                         'priority_score': priority.priority_score if priority else 50.0
                     }
+                    
+                    # Extract market cap value before leaving session
+                    market_cap_value = db_company.market_cap_value if db_company else None
                 
                 # Determine if company should be considered
                 should_consider = False
@@ -216,20 +253,18 @@ class SchedulerAgent:
                 elif days_since is not None and days_since >= analysis_interval_days:
                     should_consider = True
                     reason = ScheduleDecisionReason.STALE_DATA
-                # High-priority alone should NOT bypass freshness interval
-                # This prevents selecting the same companies repeatedly when insights already exist
-                # If we later want to allow early re-analysis for high-priority, gate it behind a config flag.
                 
                 if should_consider:
                     # Check exclusions
                     if exclude_industries and company.get("industry") in exclude_industries:
                         continue
                     
-                    candidates.append({
+                    all_potential_candidates.append({
                         "cik": cik,
                         "name": company.get("name"),
                         "ticker": company.get("ticker"),
                         "market_cap": market_cap,
+                        "market_cap_value": market_cap_value,
                         "industry": company.get("industry"),
                         "sector": company.get("sector"),
                         "days_since_last_analysis": days_since,
@@ -240,24 +275,66 @@ class SchedulerAgent:
                         "priority_score": priority_data['priority_score']
                     })
             
-            if len(candidates) >= limit:
+            if len(all_potential_candidates) >= limit * 2:
                 break
         
-        # Sort by priority: market cap first (SMALL->MEGA), then high-value matches, then staleness
+        logger.info(f"Found {len(all_potential_candidates)} total potential candidates")
+        
+        # Now apply market cap filtering based on mode
+        if use_strict_mode:
+            # STRICT MODE: Only include companies < threshold, exclude unknowns
+            candidates = [
+                c for c in all_potential_candidates
+                if c["market_cap_value"] is not None and c["market_cap_value"] < small_cap_threshold
+            ]
+            logger.info(f"STRICT mode: Filtered to {len(candidates)} companies < ${small_cap_threshold:,}")
+            
+        else:
+            # TIERED MODE: Try each threshold tier until we have enough candidates
+            for tier_threshold in tiered_thresholds:
+                if tier_threshold is None:
+                    # Final tier: include all companies with known market cap
+                    candidates = [
+                        c for c in all_potential_candidates
+                        if c["market_cap_value"] is not None
+                    ]
+                    logger.info(f"TIERED mode (unlimited): Found {len(candidates)} companies with known market cap")
+                else:
+                    # Try this threshold tier
+                    candidates = [
+                        c for c in all_potential_candidates
+                        if c["market_cap_value"] is not None and c["market_cap_value"] < tier_threshold
+                    ]
+                    logger.info(f"TIERED mode (< ${tier_threshold:,}): Found {len(candidates)} candidates")
+                
+                # If we have enough candidates, stop expanding
+                if len(candidates) >= limit:
+                    logger.info(f"✓ Sufficient candidates found at threshold: ${tier_threshold:,}" if tier_threshold else "✓ Sufficient candidates found (unlimited)")
+                    break
+        
+        if not candidates:
+            logger.warning("No candidates found even after tiered expansion - returning empty list")
+        if not candidates:
+            logger.warning("No candidates found even after tiered expansion - returning empty list")
+        
+        # Sort by market cap value (smaller first), then by priority
         def sort_key(c):
-            market_cap_rank = market_cap_priority.index(c["market_cap"]) if c["market_cap"] in market_cap_priority else 999
+            # Prioritize by actual market cap value (smaller first)
+            mc_value = c.get("market_cap_value", 999_999_999_999)
+            priority_score = c.get("priority_score", 50.0)
             has_matches = 1 if c.get("has_high_value_matches") else 0
             days_since = c.get("days_since_last_analysis", 0) or 0
-            priority_score = c.get("priority_score", 50.0)
             
             return (
-                market_cap_rank,     # Market cap priority FIRST (SMALL->MEGA)
+                mc_value,            # Smallest market cap FIRST
                 -priority_score,     # Then by priority score
                 -has_matches,        # Then high value matches
-                -days_since         # Finally by staleness
+                -days_since          # Finally by staleness
             )
         
         candidates.sort(key=sort_key)
+        
+        logger.info(f"Final candidate list: {len(candidates)} companies sorted by market cap (smallest first)")
         
         return candidates[:limit]
     

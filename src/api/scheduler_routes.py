@@ -40,6 +40,9 @@ class SchedulerStatusResponse(BaseModel):
     cron_schedule: Optional[str]
     last_run_at: Optional[str]
     next_run_at: Optional[str]
+    total_runs: Optional[int] = 0
+    successful_runs: Optional[int] = 0
+    failed_runs: Optional[int] = 0
     current_job_id: Optional[str]
     config: Dict[str, Any]
     recent_runs: List[Dict[str, Any]]

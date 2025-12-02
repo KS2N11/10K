@@ -183,6 +183,45 @@ class SchedulerMemory(Base):
         return f"<SchedulerMemory(key={self.memory_key}, type={self.memory_type})>"
 
 
+class SchedulerJob(Base):
+    """
+    Persistent state for APScheduler jobs.
+    
+    This table stores the actual state of scheduler jobs, ensuring that
+    next_run_time and other critical data persists across backend restarts.
+    """
+    __tablename__ = "scheduler_jobs"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    job_id = Column(String(100), unique=True, nullable=False, index=True)  # APScheduler job ID
+    
+    # Job configuration
+    job_name = Column(String(255), nullable=False)
+    job_type = Column(String(50), nullable=False)  # "cron", "interval", "date"
+    cron_schedule = Column(String(100), nullable=True)  # For cron jobs
+    
+    # Job state (critical for persistence)
+    is_active = Column(Boolean, default=True, nullable=False)
+    next_run_time = Column(DateTime, nullable=True, index=True)  # When job will run next
+    last_run_time = Column(DateTime, nullable=True)  # When job last ran
+    
+    # Job execution tracking
+    total_runs = Column(Integer, default=0)
+    successful_runs = Column(Integer, default=0)
+    failed_runs = Column(Integer, default=0)
+    
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    __table_args__ = (
+        Index('idx_scheduler_job_next_run', 'is_active', 'next_run_time'),
+    )
+    
+    def __repr__(self):
+        return f"<SchedulerJob(job_id={self.job_id}, next_run={self.next_run_time})>"
+
+
 class SchedulerDecision(Base):
     """Log of each decision made by the scheduler LLM agent."""
     __tablename__ = "scheduler_decisions"

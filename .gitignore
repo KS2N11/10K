@@ -41,6 +41,8 @@ src/configs/settings.yaml
 # Data and stores
 data/filings/*.html
 data/filings/*.txt
+data/filings/*.json
+data/filings/*/*.json
 src/stores/vector/
 src/stores/catalog/
 

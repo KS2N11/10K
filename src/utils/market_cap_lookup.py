@@ -163,6 +163,7 @@ class MarketCapLookup:
                         logger.debug(f"✓ CIK {cik} ({entity_name}): ${market_cap_billions:.2f}B, {sector}")
                         return {
                             "market_cap_billions": market_cap_billions,
+                            "market_cap_dollars": int(market_cap_billions * 1_000_000_000),  # Convert to dollars
                             "sector": sector,
                             "industry": sic_description,
                             "has_sec_data": True
@@ -180,8 +181,8 @@ class MarketCapLookup:
     
     async def _enrich_with_yfinance(self, ticker: str) -> Optional[Dict]:
         """
-        Get sector and industry from Yahoo Finance (used when SEC doesn't have it).
-        Only called when necessary to minimize API calls.
+        Get market cap, sector and industry from Yahoo Finance.
+        Used as fallback when SEC doesn't have data.
         """
         if not YFINANCE_AVAILABLE or not ticker:
             return None
@@ -191,10 +192,18 @@ class MarketCapLookup:
             stock = await loop.run_in_executor(None, yf.Ticker, ticker)
             info = await loop.run_in_executor(None, lambda: stock.info)
             
-            return {
+            result = {
                 "sector": info.get("sector", "Unknown"),
                 "industry": info.get("industry", "Unknown")
             }
+            
+            # Add market cap if available
+            market_cap = info.get("marketCap")
+            if market_cap:
+                result["market_cap_dollars"] = int(market_cap)
+                result["market_cap_billions"] = market_cap / 1_000_000_000
+            
+            return result
         except Exception as e:
             logger.debug(f"Failed to get Yahoo Finance data for {ticker}: {e}")
             return None
@@ -207,10 +216,10 @@ class MarketCapLookup:
         Args:
             cik: Company CIK number
             ticker: Optional ticker symbol (for sector enrichment and logging)
-            enrich_sector: If True and SEC doesn't have sector, try Yahoo Finance
+            enrich_sector: If True and SEC doesn't have data, try Yahoo Finance
         
         Returns:
-            Dict with market_cap_billions, sector, industry or None
+            Dict with market_cap_billions, market_cap_dollars, sector, industry or None
         """
         # Check cache first
         cache_key = cik
@@ -220,12 +229,30 @@ class MarketCapLookup:
         # Fetch from SEC API (primary source for market cap)
         info = await self._fetch_sec_company_facts(cik)
         
+        # If SEC doesn't have data and we have a ticker, try Yahoo Finance as fallback
+        if not info and ticker and enrich_sector:
+            logger.debug(f"SEC data unavailable for CIK {cik}, trying Yahoo Finance fallback...")
+            yf_data = await self._enrich_with_yfinance(ticker)
+            if yf_data and yf_data.get("market_cap_dollars"):
+                info = {
+                    "market_cap_dollars": yf_data["market_cap_dollars"],
+                    "market_cap_billions": yf_data["market_cap_billions"],
+                    "sector": yf_data.get("sector", "Unknown"),
+                    "industry": yf_data.get("industry", "Unknown"),
+                    "has_sec_data": False  # Mark as Yahoo Finance source
+                }
+                logger.debug(f"  ✓ Yahoo Finance fallback successful: ${info['market_cap_billions']:.2f}B")
+        
         # Enrich with Yahoo Finance if sector is Unknown and we have a ticker
-        if info and enrich_sector and ticker and info.get("sector") == "Unknown":
+        elif info and enrich_sector and ticker and info.get("sector") == "Unknown":
             yf_data = await self._enrich_with_yfinance(ticker)
             if yf_data:
                 info["sector"] = yf_data.get("sector", info["sector"])
                 info["industry"] = yf_data.get("industry", info["industry"])
+                # Also update market cap if it was missing from SEC but available from Yahoo
+                if not info.get("market_cap_dollars") and yf_data.get("market_cap_dollars"):
+                    info["market_cap_dollars"] = yf_data["market_cap_dollars"]
+                    info["market_cap_billions"] = yf_data["market_cap_billions"]
                 logger.debug(f"  Enriched with Yahoo Finance: {yf_data['sector']}")
         
         # Cache result (even if None to avoid retry)
@@ -245,6 +272,23 @@ class MarketCapLookup:
             return MarketCapTier.LARGE
         else:
             return MarketCapTier.MEGA
+    
+    def is_small_cap(self, market_cap_dollars: Optional[int], threshold: int = 2_000_000_000) -> bool:
+        """
+        Check if a company is small cap (< $2B by default).
+        
+        Args:
+            market_cap_dollars: Market cap in dollars
+            threshold: Threshold in dollars (default $2B)
+            
+        Returns:
+            True if small cap or market cap unknown, False otherwise
+        """
+        if market_cap_dollars is None:
+            # If we can't determine market cap, include it (conservative approach)
+            return True
+        
+        return market_cap_dollars < threshold
     
     async def batch_lookup(
         self, 
@@ -306,7 +350,7 @@ class MarketCapLookup:
             max_concurrent: Max concurrent requests (SEC API is fast, can handle 20+)
         
         Returns:
-            Dict of ticker -> {"tier": MarketCapTier, "sector": str, "industry": str}
+            Dict of ticker -> {"tier": MarketCapTier, "market_cap_dollars": int, "sector": str, "industry": str}
         """
         results = {}
         
@@ -331,6 +375,7 @@ class MarketCapLookup:
                     tier = self.categorize_market_cap(market_cap)
                     results[ticker] = {
                         "tier": tier,
+                        "market_cap_dollars": info.get("market_cap_dollars"),
                         "sector": info.get("sector", "Unknown"),
                         "industry": info.get("industry", "Unknown")
                     }

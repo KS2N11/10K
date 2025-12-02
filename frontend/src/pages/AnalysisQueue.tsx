@@ -630,6 +630,7 @@ const JobMonitor: React.FC<JobMonitorProps> = ({ jobId }) => {
   const fetchJobStatus = async () => {
     try {
       const status = await apiClient.getJobStatus(jobId);
+      console.log('Job Status Response:', status); // Debug log
       setJobStatus(status);
       setError(null);
     } catch (err: any) {
@@ -644,9 +645,9 @@ const JobMonitor: React.FC<JobMonitorProps> = ({ jobId }) => {
     
     // Poll every 2 seconds for live progress updates
     const interval = setInterval(() => {
-      if (jobStatus?.status === 'QUEUED' || jobStatus?.status === 'IN_PROGRESS') {
+      if (jobStatus?.status === 'queued' || jobStatus?.status === 'in_progress') {
         fetchJobStatus();
-      } else if (jobStatus?.status === 'COMPLETED' || jobStatus?.status === 'FAILED') {
+      } else if (jobStatus?.status === 'completed' || jobStatus?.status === 'failed') {
         // Stop polling for terminal states
         clearInterval(interval);
       }
@@ -663,14 +664,59 @@ const JobMonitor: React.FC<JobMonitorProps> = ({ jobId }) => {
     ? ((jobStatus.completed + jobStatus.failed + jobStatus.skipped) / jobStatus.total_companies) * 100
     : 0;
 
-  const isActive = jobStatus.status === 'QUEUED' || jobStatus.status === 'IN_PROGRESS';
+  const isActive = jobStatus.status === 'queued' || jobStatus.status === 'in_progress';
 
   // User-friendly status labels
   const getStatusDisplay = () => {
-    if (jobStatus.status === 'COMPLETED') return { label: '✅ Completed Successfully', color: 'bg-green-100 text-green-800' };
-    if (jobStatus.status === 'IN_PROGRESS') return { label: '🔄 Analyzing Companies', color: 'bg-blue-100 text-blue-800' };
-    if (jobStatus.status === 'QUEUED') return { label: '⏳ Starting Soon', color: 'bg-gray-100 text-gray-800' };
-    if (jobStatus.status === 'FAILED') return { label: '⚠️ Some Issues Occurred', color: 'bg-yellow-100 text-yellow-800' };
+    const processing = jobStatus.total_companies - (jobStatus.completed + jobStatus.failed + jobStatus.skipped);
+    
+    // If job is still running, show processing status
+    if (jobStatus.status === 'in_progress' || jobStatus.status === 'queued') {
+      return { 
+        label: `🔄 Processing (${processing} remaining)`, 
+        color: 'bg-blue-100 text-blue-800' 
+      };
+    }
+    
+    // If job is completed, determine primary status based on what happened
+    if (jobStatus.status === 'completed') {
+      // If only skipped (no completed, no failed)
+      if (jobStatus.skipped > 0 && jobStatus.completed === 0 && jobStatus.failed === 0) {
+        return { 
+          label: `⏭️ ${jobStatus.skipped} Skipped (Already Analyzed)`, 
+          color: 'bg-gray-100 text-gray-700' 
+        };
+      }
+      
+      // If only failed (no completed, no skipped)
+      if (jobStatus.failed > 0 && jobStatus.completed === 0 && jobStatus.skipped === 0) {
+        return { 
+          label: `❌ ${jobStatus.failed} Failed`, 
+          color: 'bg-red-100 text-red-800' 
+        };
+      }
+      
+      // Mixed results - show breakdown
+      const parts = [];
+      if (jobStatus.completed > 0) parts.push(`✅ ${jobStatus.completed} Completed`);
+      if (jobStatus.skipped > 0) parts.push(`⏭️ ${jobStatus.skipped} Skipped`);
+      if (jobStatus.failed > 0) parts.push(`❌ ${jobStatus.failed} Failed`);
+      
+      // Determine color based on success rate
+      let color = 'bg-green-100 text-green-800';
+      if (jobStatus.failed > 0) {
+        color = 'bg-yellow-100 text-yellow-800';
+      } else if (jobStatus.completed === 0 && jobStatus.skipped > 0) {
+        color = 'bg-gray-100 text-gray-700';
+      }
+      
+      return { 
+        label: parts.length > 0 ? parts.join(' · ') : '✅ Completed', 
+        color 
+      };
+    }
+    
+    if (jobStatus.status === 'failed') return { label: '⚠️ Job Failed', color: 'bg-red-100 text-red-800' };
     return { label: jobStatus.status, color: 'bg-gray-100 text-gray-800' };
   };
 
@@ -757,7 +803,7 @@ const JobMonitor: React.FC<JobMonitorProps> = ({ jobId }) => {
       )}
 
       {/* Completion Message */}
-      {jobStatus.status === 'COMPLETED' && (
+      {jobStatus.status === 'completed' && (
         <div className="mt-3 text-center text-sm bg-green-50 text-green-700 py-2 rounded">
           Analysis complete! Click "View Details" to see all companies.
         </div>

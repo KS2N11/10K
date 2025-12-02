@@ -43,7 +43,7 @@ class Company(Base):
     industry = Column(String(255), nullable=True, index=True)
     sector = Column(String(100), nullable=True, index=True)
     market_cap = Column(SQLEnum(MarketCap), nullable=True, index=True)
-    market_cap_value = Column(Float, nullable=True)  # Actual $ value
+    market_cap_value = Column(Integer, nullable=True)  # Actual $ value in dollars
     
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

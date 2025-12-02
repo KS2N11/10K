@@ -11,7 +11,7 @@ from apscheduler.triggers.date import DateTrigger
 
 from src.database.database import get_db
 from src.database.scheduler_models import (
-    SchedulerConfig, SchedulerRun, ScheduleStatus
+    SchedulerConfig, SchedulerRun, ScheduleStatus, SchedulerJob
 )
 from src.database.repository import AnalysisJobRepository
 from src.services.scheduler_agent import SchedulerAgent
@@ -37,7 +37,7 @@ class AutonomousScheduler:
         """
         Initialize autonomous scheduler.
         
-        Args:
+        Args: 
             config: Configuration dict with API keys, settings
         """
         self.config = config
@@ -122,6 +122,10 @@ class AutonomousScheduler:
         # Start APScheduler (needed for cron mode)
         self.scheduler.start()
         self.is_running = True
+        
+        # Sync database state with APScheduler after startup (must be after scheduler.start())
+        if self.scheduler_config_data["is_active"] and not self.scheduler_config_data.get("continuous_mode", False):
+            self._sync_job_state_to_db()
         
         logger.info("✅ Autonomous scheduler started successfully")
     
@@ -264,6 +268,9 @@ class AutonomousScheduler:
         """Get current scheduler status."""
         with get_db() as db:
             scheduler_config = db.query(SchedulerConfig).first()
+            scheduler_job = db.query(SchedulerJob).filter(
+                SchedulerJob.job_id == "main_cron_job"
+            ).first()
             
             # Get recent runs
             recent_runs = db.query(SchedulerRun).order_by(
@@ -276,8 +283,6 @@ class AutonomousScheduler:
                 config_data = {
                     "is_active": scheduler_config.is_active,
                     "cron_schedule": scheduler_config.cron_schedule,
-                    "last_run_at": scheduler_config.last_run_at.isoformat() if scheduler_config.last_run_at else None,
-                    "next_run_at": scheduler_config.next_run_at.isoformat() if scheduler_config.next_run_at else None,
                     "market_cap_priority": scheduler_config.market_cap_priority,
                     "batch_size": scheduler_config.batch_size,
                     "analysis_interval_days": scheduler_config.analysis_interval_days,
@@ -285,6 +290,17 @@ class AutonomousScheduler:
                     "max_companies_per_run": scheduler_config.max_companies_per_run,
                     "prioritize_industries": scheduler_config.prioritize_industries,
                     "exclude_industries": scheduler_config.exclude_industries
+                }
+            
+            # Get job state from persistent table
+            job_data = {}
+            if scheduler_job:
+                job_data = {
+                    "last_run_at": scheduler_job.last_run_time.isoformat() if scheduler_job.last_run_time else None,
+                    "next_run_at": scheduler_job.next_run_time.isoformat() if scheduler_job.next_run_time else None,
+                    "total_runs": scheduler_job.total_runs,
+                    "successful_runs": scheduler_job.successful_runs,
+                    "failed_runs": scheduler_job.failed_runs
                 }
             
             recent_runs_data = [
@@ -305,8 +321,11 @@ class AutonomousScheduler:
                 "is_running": self.is_running,
                 "is_active": config_data.get("is_active", False),
                 "cron_schedule": config_data.get("cron_schedule"),
-                "last_run_at": config_data.get("last_run_at"),
-                "next_run_at": config_data.get("next_run_at"),
+                "last_run_at": job_data.get("last_run_at"),
+                "next_run_at": job_data.get("next_run_at"),
+                "total_runs": job_data.get("total_runs", 0),
+                "successful_runs": job_data.get("successful_runs", 0),
+                "failed_runs": job_data.get("failed_runs", 0),
                 "current_job_id": self._current_job_id,
                 "config": {
                     "market_cap_priority": config_data.get("market_cap_priority", []),
@@ -418,19 +437,38 @@ class AutonomousScheduler:
                 misfire_grace_time=600,
             )
             
-            # Calculate next run time
+            # Calculate next run time from APScheduler
             next_job = self.scheduler.get_job("main_cron_job")
             if next_job:
                 next_run = next_job.next_run_time if hasattr(next_job, 'next_run_time') else None
             else:
                 next_run = None
             
-            # Update config
+            # Persist to database
             with get_db() as db:
-                scheduler_config = db.query(SchedulerConfig).first()
-                if scheduler_config and next_run:
-                    scheduler_config.next_run_at = next_run
-                    db.commit()
+                scheduler_job = db.query(SchedulerJob).filter(
+                    SchedulerJob.job_id == "main_cron_job"
+                ).first()
+                
+                if not scheduler_job:
+                    # Create new job record
+                    scheduler_job = SchedulerJob(
+                        job_id="main_cron_job",
+                        job_name="Autonomous Analysis Scheduler",
+                        job_type="cron",
+                        cron_schedule=self.scheduler_config_data["cron_schedule"],
+                        is_active=True,
+                        next_run_time=next_run
+                    )
+                    db.add(scheduler_job)
+                else:
+                    # Update existing job record
+                    scheduler_job.cron_schedule = self.scheduler_config_data["cron_schedule"]
+                    scheduler_job.is_active = True
+                    scheduler_job.next_run_time = next_run
+                    scheduler_job.updated_at = datetime.utcnow()
+                
+                db.commit()
             
             logger.info(f"✅ Cron job scheduled: {self.scheduler_config_data['cron_schedule']} (next run: {next_run})")
         
@@ -445,6 +483,37 @@ class AutonomousScheduler:
                 logger.info("Removed existing cron job")
         except Exception as e:
             logger.debug(f"No cron job to remove: {e}")
+    
+    def _sync_job_state_to_db(self):
+        """
+        Sync APScheduler job state to database.
+        
+        This is called after startup to ensure the database reflects the actual
+        next_run_time calculated by APScheduler, preventing stale data issues.
+        """
+        try:
+            next_job = self.scheduler.get_job("main_cron_job")
+            if not next_job:
+                logger.warning("No cron job found to sync")
+                return
+            
+            next_run = next_job.next_run_time if hasattr(next_job, 'next_run_time') else None
+            
+            with get_db() as db:
+                scheduler_job = db.query(SchedulerJob).filter(
+                    SchedulerJob.job_id == "main_cron_job"
+                ).first()
+                
+                if scheduler_job:
+                    scheduler_job.next_run_time = next_run
+                    scheduler_job.updated_at = datetime.utcnow()
+                    db.commit()
+                    logger.info(f"✅ Synced job state to database: next_run_time = {next_run}")
+                else:
+                    logger.warning("No scheduler job found in database to sync")
+        
+        except Exception as e:
+            logger.error(f"Error syncing job state to database: {e}")
     
     async def _scheduled_trigger(self):
         """Triggered by cron schedule."""
@@ -604,17 +673,32 @@ class AutonomousScheduler:
                 # Wait before checking again
                 await asyncio.sleep(10)
             
-            # Update scheduler config
+            # Update scheduler job state
             with get_db() as db:
-                scheduler_config = db.query(SchedulerConfig).first()
-                scheduler_config.last_run_at = datetime.utcnow()
+                scheduler_job = db.query(SchedulerJob).filter(
+                    SchedulerJob.job_id == "main_cron_job"
+                ).first()
                 
-                # Calculate next run time
-                next_job = self.scheduler.get_job("main_cron_job")
-                if next_job:
-                    scheduler_config.next_run_at = next_job.next_run_time
-                
-                db.commit()
+                if scheduler_job:
+                    scheduler_job.last_run_time = datetime.utcnow()
+                    scheduler_job.total_runs += 1
+                    
+                    # Update success/failure counters
+                    run_record = db.query(SchedulerRun).filter(
+                        SchedulerRun.run_id == run_id
+                    ).first()
+                    if run_record and run_record.status == "completed":
+                        scheduler_job.successful_runs += 1
+                    elif run_record and run_record.status == "failed":
+                        scheduler_job.failed_runs += 1
+                    
+                    # Calculate next run time from APScheduler
+                    next_job = self.scheduler.get_job("main_cron_job")
+                    if next_job:
+                        scheduler_job.next_run_time = next_job.next_run_time
+                    
+                    scheduler_job.updated_at = datetime.utcnow()
+                    db.commit()
         
         except Exception as e:
             logger.error(f"Error in scheduled run {run_id}: {e}")

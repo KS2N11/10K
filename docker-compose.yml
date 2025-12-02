@@ -61,7 +61,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_INITDB_ARGS: "-E UTF8 --locale=en_US.utf8"
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init_db.py:/docker-entrypoint-initdb.d/init_db.py
